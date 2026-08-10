@@ -73,3 +73,34 @@ pkg/
 - [x] Suporte nativo a parsing de arquivos `.json` e `.yaml`.
 - [x] Testes unitários cobrindo varredura de arquivos e tratamento de erros para arquivos corrompidos.
 - [x] Integração com as interfaces de UI (TUI/GUI) para exibição do menu de seleção.
+
+---
+
+# 🎯 Fase 8: Sistema de Pontuação em Tempo Real (`pkg/score`)
+
+**Objetivo da Task:** Implementar a captura de microfone, detecção de tom (pitch) e avaliação da performance vocal do usuário durante a reprodução da música.
+
+## 🛠️ Passos de Implementação
+
+### 1. Captura/Entrada de Áudio (Microfone)
+- Criar streamer/leitor de entrada PCM para ler amostras de áudio do microfone padrão do sistema em tempo real de forma assíncrona.
+
+### 2. Detector de Tom/Frequência (Pitch Detection)
+- Implementar algoritmo de detecção de tom (ex: Autocorrelação ou YIN) para determinar a frequência fundamental ($Hz$) da voz cantada pelo usuário.
+- Mapear a frequência detectada para a nota MIDI / tom musical correspondente.
+
+### 3. Módulo de Scoring (`pkg/score`)
+- Comparar a nota cantada com a nota/acorde de referência da `TimelineEvent` ativa no instante atual.
+- Calcular precisão/tolerância de afinação e acumular pontuação dinâmica (0 a 100 pontos).
+
+### 4. Exibição na Interface de Usuário
+- Atualizar a interface TUI (`pkg/ui/tui`) para exibir a pontuação parcial em tempo real e o placar final ao término da faixa.
+
+---
+
+## 🚀 Requisitos de Entrega da Fase 8
+
+- [ ] Módulo de captura de microfone funcional.
+- [ ] Algoritmo de detecção de frequência (Pitch Detector) implementado.
+- [ ] Calculadora de pontuação baseada em tempo e afinação (`pkg/score`).
+- [ ] Exibição da pontuação em tempo real na TUI e relatório ao final da música.
