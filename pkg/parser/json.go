@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/username/pioke/pkg/model"
+	"pioke/pkg/model"
 )
 
 // LoadJSON lê e valida um arquivo de música em formato JSON.

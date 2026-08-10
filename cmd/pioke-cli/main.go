@@ -19,7 +19,7 @@ import (
 
 func main() {
 	filePathFlag := flag.String("file", "", "Caminho do arquivo de música em formato JSON")
-	noAudioFlag := flag.Bool("no-audio", false "Desabilita a inicialização e saída do motor de áudio")
+	noAudioFlag := flag.Bool("no-audio", false, "Desabilita a inicialização e saída do motor de áudio")
 	flag.Parse()
 
 	filePath := *filePathFlag
