@@ -139,28 +139,40 @@ func (e *Engine) run() {
 			currentState := e.state
 			e.mu.Unlock()
 
-			var activeEvent *model.TimelineEvent
+			var emittedAny bool
 
 			// Verifica se há eventos a emitir no tempo atual
 			if e.song != nil {
-				for i := range e.song.Timeline {
+				for i := lastEmittedIndex + 1; i < len(e.song.Timeline); i++ {
 					event := &e.song.Timeline[i]
 					eventTime := event.TimeMS
 					if eventTime == 0 && event.Duration > 0 {
 						eventTime = event.Duration.Milliseconds()
 					}
 
-					if i > lastEmittedIndex && eventTime <= currentPos {
-						activeEvent = event
+					if eventTime <= currentPos {
+						e.eventsChan <- model.PlaybackEvent{
+							CurrentTimeMS: currentPos,
+							ActiveEvent:   event,
+							State:         currentState,
+						}
 						lastEmittedIndex = i
+						emittedAny = true
+					} else {
+						// Como a linha do tempo está em ordem cronológica,
+						// podemos parar de verificar os próximos eventos no futuro.
+						break
 					}
 				}
 			}
 
-			e.eventsChan <- model.PlaybackEvent{
-				CurrentTimeMS: currentPos,
-				ActiveEvent:   activeEvent,
-				State:         currentState,
+			// Se nenhum evento específico foi emitido, envia um tick de tempo normal
+			if !emittedAny {
+				e.eventsChan <- model.PlaybackEvent{
+					CurrentTimeMS: currentPos,
+					ActiveEvent:   nil,
+					State:         currentState,
+				}
 			}
 
 			// Se ultrapassou o fim da música, encerra a reprodução
