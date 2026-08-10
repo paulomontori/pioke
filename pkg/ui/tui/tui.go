@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"time"
 
 	"pioke/pkg/model"
 	"pioke/pkg/ui"
