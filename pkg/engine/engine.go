@@ -69,6 +69,11 @@ func (e *Engine) Play() {
 	go e.run()
 }
 
+// Start é um alias para Play para garantir compatibilidade
+func (e *Engine) Start() {
+	e.Play()
+}
+
 // Pause pausa a reprodução mantendo a posição atual
 func (e *Engine) Pause() {
 	e.mu.Lock()

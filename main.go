@@ -8,17 +8,18 @@ import (
 
 	"pioke/pkg/audio"
 	"pioke/pkg/engine"
-	"pioke/pkg/parser"
+	"pioke/pkg/song"
+	"pioke/pkg/ui"
 	"pioke/pkg/ui/tui"
 )
 
 func main() {
-	sampleFile := "examples/sample.json"
+	sampleFile := "songs/parabens.yaml"
 	if len(os.Args) > 1 {
 		sampleFile = os.Args[1]
 	}
 
-	s, err := parser.ParseSong(sampleFile)
+	s, err := song.LoadSong(sampleFile)
 	if err != nil {
 		log.Fatalf("Erro ao carregar a música: %v\n", err)
 	}
@@ -32,18 +33,22 @@ func main() {
 
 	synth := audio.NewSynth()
 	eng := engine.NewEngine(s)
-	eng.Start()
+	eng.Play()
 
 	go func() {
 		for pbEvent := range eng.Events() {
-			if pbEvent.Current != nil {
-				chord := pbEvent.Current.ChordStr
-				if chord == "" && pbEvent.Current.Chord != nil {
-					chord = pbEvent.Current.Chord.Name
+			if pbEvent.ActiveEvent != nil {
+				chord := pbEvent.ActiveEvent.ChordStr
+				if chord == "" && pbEvent.ActiveEvent.Chord != nil {
+					chord = pbEvent.ActiveEvent.Chord.Name
 				}
 				synth.PlayChord(chord)
 			}
-			_ = termUI.RenderTick(pbEvent)
+			_ = termUI.RenderTick(ui.PlaybackEvent{
+				Song:     s,
+				Current:  pbEvent.ActiveEvent,
+				Position: pbEvent.CurrentTimeMS,
+			})
 		}
 	}()
 
