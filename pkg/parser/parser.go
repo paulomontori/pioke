@@ -57,10 +57,22 @@ func validateAndProcessSong(s *model.Song) error {
 		return fmt.Errorf("metadado obrigatório 'title' está ausente")
 	}
 
+	// Calcula a duração padrão de 1 batida baseada no BPM (se existir)
+	var defaultDurationMS int64 = 2000
+	bpm := s.BPM
+	if bpm == 0 {
+		bpm = s.Metadata.BPM
+	}
+	if bpm > 0 {
+		defaultDurationMS = int64(60000 / bpm)
+	}
+
+	var accumulatedTimeMS int64 = 0
+
 	for i := range s.Timeline {
 		event := &s.Timeline[i]
 		
-		// Preenche TimeMS a partir do Timestamp se necessário
+		// 1. Preenche TimeMS a partir do Timestamp se necessário
 		if event.TimeMS == 0 && event.Timestamp != "" {
 			d, err := parseTimestamp(event.Timestamp)
 			if err != nil {
@@ -69,10 +81,21 @@ func validateAndProcessSong(s *model.Song) error {
 			event.TimeMS = d.Milliseconds()
 		}
 
-		// Preenche Duration (time.Duration) a partir do DurationMS
-		if event.DurationMS > 0 {
-			event.Duration = time.Duration(event.DurationMS) * time.Millisecond
+		// 2. Se não tem TimeMS nem Timestamp, assume que toca logo após o evento anterior
+		if event.TimeMS == 0 && event.Timestamp == "" && i > 0 {
+			event.TimeMS = accumulatedTimeMS
 		}
+
+		// 3. Se não tem duração definida, usa a duração de 1 batida do BPM
+		if event.DurationMS <= 0 {
+			event.DurationMS = defaultDurationMS
+		}
+
+		// 4. Preenche Duration (time.Duration) a partir do DurationMS
+		event.Duration = time.Duration(event.DurationMS) * time.Millisecond
+
+		// 5. Atualiza o tempo acumulado para o próximo evento
+		accumulatedTimeMS = event.TimeMS + event.DurationMS
 	}
 
 	return nil
