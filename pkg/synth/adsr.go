@@ -38,10 +38,10 @@ func GeneratePCMWithADSR(freqs []float64, duration time.Duration) []byte {
 	}
 
 	adsr := ADSR{
-		AttackTime:  0.05,
-		DecayTime:   0.1,
-		SustainLev:  0.7,
-		ReleaseTime: 0.2,
+		AttackTime:  0.015, // 15ms
+		DecayTime:   0.050, // 50ms
+		SustainLev:  0.8,
+		ReleaseTime: 0.030, // 30ms
 	}
 
 	totalTime := duration.Seconds()
