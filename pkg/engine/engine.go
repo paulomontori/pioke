@@ -128,14 +128,27 @@ func (e *Engine) run() {
 		totalDurationMS = lastEvent.TimeMS + dur
 	}
 
+	// Captura o tempo real de início para evitar drift (atraso acumulado)
+	e.mu.Lock()
+	startPos := e.positionMS
+	e.mu.Unlock()
+	playStart := time.Now()
+
 	for {
 		select {
 		case <-e.stopChan:
+			// Salva a posição exata ao pausar
+			e.mu.Lock()
+			if e.state == model.PAUSED {
+				e.positionMS = startPos + time.Since(playStart).Milliseconds()
+			}
+			e.mu.Unlock()
 			return
 		case <-e.ticker.C:
 			e.mu.Lock()
-			e.positionMS += 10
-			currentPos := e.positionMS
+			// Calcula a posição baseada no relógio real, não em contagem de ticks
+			currentPos := startPos + time.Since(playStart).Milliseconds()
+			e.positionMS = currentPos
 			currentState := e.state
 			e.mu.Unlock()
 
