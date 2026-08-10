@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"pioke/pkg/audio"
 	"pioke/pkg/engine"
@@ -52,7 +50,10 @@ func main() {
 		}
 	}()
 
-	time.Sleep(16 * time.Second)
+	// Inicia a TUI interativa (mantém a aplicação rodando até pressionar 'q' ou 'Ctrl+C')
+	if err := termUI.Run(); err != nil {
+		log.Printf("Erro na execução da TUI: %v\n", err)
+	}
+
 	eng.Stop()
-	fmt.Println("\nReprodução concluída.")
 }
