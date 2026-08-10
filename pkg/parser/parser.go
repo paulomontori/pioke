@@ -118,7 +118,15 @@ func validateAndProcessSong(s *model.Song) error {
 		// 4. Preenche Duration (time.Duration) a partir do DurationMS
 		event.Duration = time.Duration(event.DurationMS) * time.Millisecond
 
-		// 5. Atualiza o tempo acumulado para o próximo evento
+		// 5. Preenche o Timestamp em string caso esteja vazio (útil para UI)
+		if event.Timestamp == "" {
+			totalSeconds := event.TimeMS / 1000
+			mins := totalSeconds / 60
+			secs := float64(event.TimeMS%60000) / 1000.0
+			event.Timestamp = fmt.Sprintf("%02d:%05.2f", mins, secs)
+		}
+
+		// 6. Atualiza o tempo acumulado para o próximo evento
 		accumulatedTimeMS = event.TimeMS + event.DurationMS
 	}
 
