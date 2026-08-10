@@ -34,3 +34,7 @@ Histórico sequencial das implementações e commits realizados no projeto:
 7. **`130b550`** - `feat: adiciona interface gráfica 2D usando Ebitengine`
    - Implementação da Fase 6 do projeto em `pkg/ui/gui/font.go`, `pkg/ui/gui/view.go` e `pkg/ui/gui/ebiten.go`.
    - Suporte a renderização 2D, redimensionamento de janela, alternância em tela cheia (F11) e testes em `pkg/ui/gui/gui_test.go`.
+
+8. **`Fase 7`** - `feat: adiciona biblioteca e gerenciador de músicas`
+   - Criação do pacote `pkg/song` para varredura de diretórios e carregamento dinâmico de faixas em `pkg/song/library.go` e `pkg/song/loader.go`.
+   - Adição dos testes unitários de biblioteca em `pkg/song/library_test.go`.
