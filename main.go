@@ -15,6 +15,7 @@ import (
 	"pioke/pkg/synth"
 	"pioke/pkg/ui"
 	"pioke/pkg/ui/tui"
+	"pioke/pkg/model"
 )
 
 func main() {
@@ -69,29 +70,32 @@ func main() {
 	go func() {
 		defer close(doneChan)
 		
+		var currentEvent *model.TimelineEvent
 		var currentChord string
-		var chordStartMS int64
+		var eventStartMS int64
 		var lastTimeMS int64
+		isFirstEvent := true
 
 		for pbEvent := range eng.Events() {
 			lastTimeMS = pbEvent.CurrentTimeMS
-			chord := ""
-			
-			if pbEvent.ActiveEvent != nil {
-				chord = pbEvent.ActiveEvent.ChordStr
-				if chord == "" && pbEvent.ActiveEvent.Chord != nil {
-					chord = pbEvent.ActiveEvent.Chord.Name
-				}
-			}
 
-			// Se o acorde mudou, renderiza o acorde anterior com a duração exata
-			if chord != currentChord {
-				if outputFile != "" && currentChord != "" {
-					durMS := pbEvent.CurrentTimeMS - chordStartMS
+			// Se mudamos de evento na timeline (mesmo que seja o mesmo acorde, é uma nova batida/sílaba)
+			if isFirstEvent || pbEvent.ActiveEvent != currentEvent {
+				if !isFirstEvent && outputFile != "" {
+					durMS := pbEvent.CurrentTimeMS - eventStartMS
 					if durMS > 0 {
-						freqs := synth.GetChordFrequencies(currentChord)
-						if len(freqs) > 0 {
-							pcm := synth.GeneratePCMWithADSR(freqs, time.Duration(durMS)*time.Millisecond)
+						if currentChord != "" {
+							freqs := synth.GetChordFrequencies(currentChord)
+							if len(freqs) > 0 {
+								pcm := synth.GeneratePCMWithADSR(freqs, time.Duration(durMS)*time.Millisecond)
+								pcmMu.Lock()
+								pcmBuffer = append(pcmBuffer, pcm...)
+								pcmMu.Unlock()
+							}
+						} else {
+							// Gera silêncio para manter o tempo correto da música no WAV
+							numSamples := int(float64(synth.SampleRate) * float64(durMS) / 1000.0)
+							pcm := make([]byte, numSamples*2) // 16-bit mono (2 bytes por sample)
 							pcmMu.Lock()
 							pcmBuffer = append(pcmBuffer, pcm...)
 							pcmMu.Unlock()
@@ -99,11 +103,20 @@ func main() {
 					}
 				}
 
-				currentChord = chord
-				chordStartMS = pbEvent.CurrentTimeMS
+				isFirstEvent = false
+				currentEvent = pbEvent.ActiveEvent
+				eventStartMS = pbEvent.CurrentTimeMS
+				currentChord = ""
 				
-				if chord != "" {
-					audioSynth.PlayChord(chord)
+				if currentEvent != nil {
+					currentChord = currentEvent.ChordStr
+					if currentChord == "" && currentEvent.Chord != nil {
+						currentChord = currentEvent.Chord.Name
+					}
+				}
+
+				if currentChord != "" {
+					audioSynth.PlayChord(currentChord)
 				} else {
 					audioSynth.PlayChord("") // Silêncio
 				}
@@ -117,15 +130,27 @@ func main() {
 			})
 		}
 
-		// Flush do último acorde quando a música terminar
-		if outputFile != "" && currentChord != "" {
-			durMS := lastTimeMS - chordStartMS
+		// Flush do último evento quando a música terminar
+		if outputFile != "" && !isFirstEvent {
+			durMS := lastTimeMS - eventStartMS
+			if durMS <= 0 && currentEvent != nil {
+				durMS = currentEvent.DurationMS
+			}
 			if durMS <= 0 {
 				durMS = 1636 // fallback para o último acorde
 			}
-			freqs := synth.GetChordFrequencies(currentChord)
-			if len(freqs) > 0 {
-				pcm := synth.GeneratePCMWithADSR(freqs, time.Duration(durMS)*time.Millisecond)
+			
+			if currentChord != "" {
+				freqs := synth.GetChordFrequencies(currentChord)
+				if len(freqs) > 0 {
+					pcm := synth.GeneratePCMWithADSR(freqs, time.Duration(durMS)*time.Millisecond)
+					pcmMu.Lock()
+					pcmBuffer = append(pcmBuffer, pcm...)
+					pcmMu.Unlock()
+				}
+			} else {
+				numSamples := int(float64(synth.SampleRate) * float64(durMS) / 1000.0)
+				pcm := make([]byte, numSamples*2)
 				pcmMu.Lock()
 				pcmBuffer = append(pcmBuffer, pcm...)
 				pcmMu.Unlock()
