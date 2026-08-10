@@ -40,13 +40,23 @@ func ParseSong(filePath string) (*song.Song, error) {
 
 // validateAndProcessSong valida campos obrigatorios e converte timestamps de string para time.Duration
 func validateAndProcessSong(s *song.Song) error {
-	if s.Metadata.Title == "" {
+	// Normaliza metadados no topo ou em Metadata
+	if s.Title == "" && s.Metadata.Title != "" {
+		s.Title = s.Metadata.Title
+	}
+	if s.Artist == "" && s.Metadata.Artist != "" {
+		s.Artist = s.Metadata.Artist
+	}
+
+	if s.Title == "" && s.Metadata.Title == "" {
 		return fmt.Errorf("metadado obrigatorio 'title' esta ausente")
 	}
 
 	for i := range s.Timeline {
 		event := &s.Timeline[i]
-		if event.Timestamp != "" {
+		if event.TimeMS > 0 {
+			event.Duration = time.Duration(event.TimeMS) * time.Millisecond
+		} else if event.Timestamp != "" {
 			d, err := parseTimestamp(event.Timestamp)
 			if err != nil {
 				return fmt.Errorf("timestamp invalido na linha do tempo [%s]: %w", event.Timestamp, err)
