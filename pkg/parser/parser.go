@@ -88,47 +88,55 @@ func validateAndProcessSong(s *model.Song) error {
 		defaultDurationMS = int64(math.Round(beatDurationMS * float64(beatsPerMeasure)))
 	}
 
-	var accumulatedTimeMS int64 = 0
-
+	// Passo 1: Converter todos os Timestamps explícitos em TimeMS
 	for i := range s.Timeline {
 		event := &s.Timeline[i]
-		
-		// 1. Se TimeMS está zerado mas temos um Timestamp em string, usamos ele
-		if event.TimeMS == 0 && event.Timestamp != "" && event.Timestamp != "00:00.00" {
+		if event.TimeMS == 0 && event.Timestamp != "" {
 			d, err := parseTimestamp(event.Timestamp)
-			if err != nil {
-				return fmt.Errorf("timestamp inválido na linha do tempo [%s]: %w", event.Timestamp, err)
-			}
-			event.TimeMS = d.Milliseconds()
-		}
-
-		// 2. Se não temos TimeMS nem Timestamp, calculamos sequencialmente
-		// O evento 0 começa em 0. Os demais começam no accumulatedTimeMS.
-		if event.TimeMS == 0 && event.Timestamp == "" {
-			if i > 0 {
-				event.TimeMS = accumulatedTimeMS
-			} else {
-				event.TimeMS = 0
+			if err == nil {
+				event.TimeMS = d.Milliseconds()
 			}
 		}
+	}
 
-		// 3. Se a duração não foi definida, usamos a duração calculada do compasso
+	// Passo 2: Calcular TimeMS e DurationMS ausentes
+	var accumulatedTimeMS int64 = 0
+	for i := range s.Timeline {
+		event := &s.Timeline[i]
+
+		// Se TimeMS é 0 e não é o primeiro evento, significa que não havia timestamp.
+		// Assumimos que ele começa logo após o evento anterior.
+		if event.TimeMS == 0 && i > 0 {
+			event.TimeMS = accumulatedTimeMS
+		}
+
+		// Se a duração não foi definida, tentamos inferir pelo início do próximo evento
 		if event.DurationMS <= 0 {
-			event.DurationMS = defaultDurationMS
+			if i+1 < len(s.Timeline) {
+				nextEvent := &s.Timeline[i+1]
+				if nextEvent.TimeMS > event.TimeMS {
+					event.DurationMS = nextEvent.TimeMS - event.TimeMS
+				}
+			}
+
+			// Se ainda assim não temos duração (ex: último evento ou sem timestamps), usamos o padrão do BPM
+			if event.DurationMS <= 0 {
+				event.DurationMS = defaultDurationMS
+			}
 		}
 
-		// 4. Preenche Duration (time.Duration) com a duração real da nota (DurationMS)
+		// Preenche Duration (time.Duration) com a duração real da nota (DurationMS)
 		event.Duration = time.Duration(event.DurationMS) * time.Millisecond
 
-		// 5. Preenche o Timestamp em string caso esteja vazio (útil para UI)
+		// Preenche o Timestamp em string caso esteja vazio (útil para UI)
 		if event.Timestamp == "" {
 			totalSeconds := event.TimeMS / 1000
 			mins := totalSeconds / 60
 			secs := float64(event.TimeMS%60000) / 1000.0
-			event.Timestamp = fmt.Sprintf("%02d:%05.2f", mins, secs)
+			event.Timestamp = fmt.Sprintf("%02d:%05.3f", mins, secs)
 		}
 
-		// 6. Garante que o objeto Chord esteja preenchido para o sintetizador
+		// Garante que o objeto Chord esteja preenchido para o sintetizador
 		if event.ChordStr != "" && event.Chord == nil {
 			event.Chord = &model.ChordEvent{
 				Name:     event.ChordStr,
@@ -136,7 +144,7 @@ func validateAndProcessSong(s *model.Song) error {
 			}
 		}
 
-		// 7. Atualiza o tempo acumulado para o próximo evento
+		// Atualiza o tempo acumulado para o próximo evento
 		accumulatedTimeMS = event.TimeMS + event.DurationMS
 	}
 
