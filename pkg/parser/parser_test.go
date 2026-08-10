@@ -86,9 +86,9 @@ func TestParseSongJSON(t *testing.T) {
 		t.Errorf("Duration (start time) do evento 0 esperada 1000ms, obtida %v", song.Timeline[0].Duration)
 	}
 	
-	// Evento 1: Último evento, usa default (BPM 120, 4/4 -> 2000ms)
-	if song.Timeline[1].DurationMS != 2000 {
-		t.Errorf("Duração do evento 1 esperada 2000ms, obtida %d", song.Timeline[1].DurationMS)
+	// Evento 1: Último evento, herda a duração do anterior (1000ms)
+	if song.Timeline[1].DurationMS != 1000 {
+		t.Errorf("Duração do evento 1 esperada 1000ms, obtida %d", song.Timeline[1].DurationMS)
 	}
 	if song.Timeline[1].Duration != 2000*time.Millisecond {
 		t.Errorf("Duration (start time) do evento 1 esperada 2000ms, obtida %v", song.Timeline[1].Duration)
@@ -178,16 +178,16 @@ func TestValidateAndProcessSong_ExplicitTimes(t *testing.T) {
 	}
 }
 
-func TestValidateAndProcessSong_InferDurationFromNext(t *testing.T) {
-	// Cenário 3: Música com timestamps, mas sem duration_ms
+func TestValidateAndProcessSong_InheritDuration(t *testing.T) {
+	// Cenário 3: Música com primeira duração explícita, e as seguintes vazias (como evidencias_2.json)
 	song := &model.Song{
 		Metadata: model.Metadata{
-			Title: "Teste Inferência",
+			Title: "Teste Herança",
 		},
 		Timeline: []model.TimelineEvent{
-			{Timestamp: "00:00.000"},
-			{Timestamp: "00:00.500"},
-			{Timestamp: "00:01.500"},
+			{TimeMS: 0, DurationMS: 297},
+			{ChordStr: "E5+"},
+			{ChordStr: "A"},
 		},
 	}
 
@@ -196,14 +196,19 @@ func TestValidateAndProcessSong_InferDurationFromNext(t *testing.T) {
 		t.Fatalf("Erro inesperado: %v", err)
 	}
 
-	if song.Timeline[0].DurationMS != 500 {
-		t.Errorf("Evento 0: DurationMS esperado 500, obtido %d", song.Timeline[0].DurationMS)
+	if song.Timeline[0].DurationMS != 297 {
+		t.Errorf("Evento 0: DurationMS esperado 297, obtido %d", song.Timeline[0].DurationMS)
 	}
-	if song.Timeline[1].DurationMS != 1000 {
-		t.Errorf("Evento 1: DurationMS esperado 1000, obtido %d", song.Timeline[1].DurationMS)
+	if song.Timeline[1].DurationMS != 297 {
+		t.Errorf("Evento 1: DurationMS esperado 297 (herdado), obtido %d", song.Timeline[1].DurationMS)
 	}
-	// O último evento usa o default (2000ms pois não tem BPM definido)
-	if song.Timeline[2].DurationMS != 2000 {
-		t.Errorf("Evento 2: DurationMS esperado 2000, obtido %d", song.Timeline[2].DurationMS)
+	if song.Timeline[1].TimeMS != 297 {
+		t.Errorf("Evento 1: TimeMS esperado 297, obtido %d", song.Timeline[1].TimeMS)
+	}
+	if song.Timeline[2].DurationMS != 297 {
+		t.Errorf("Evento 2: DurationMS esperado 297 (herdado), obtido %d", song.Timeline[2].DurationMS)
+	}
+	if song.Timeline[2].TimeMS != 594 {
+		t.Errorf("Evento 2: TimeMS esperado 594, obtido %d", song.Timeline[2].TimeMS)
 	}
 }

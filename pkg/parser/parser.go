@@ -110,8 +110,9 @@ func validateAndProcessSong(s *model.Song) error {
 			event.TimeMS = accumulatedTimeMS
 		}
 
-		// Se a duração não foi definida, tentamos inferir pelo início do próximo evento
+		// Se a duração não foi definida, tentamos inferir
 		if event.DurationMS <= 0 {
+			// 1. Tenta inferir pelo início do próximo evento (se ele já tiver TimeMS definido explicitamente)
 			if i+1 < len(s.Timeline) {
 				nextEvent := &s.Timeline[i+1]
 				if nextEvent.TimeMS > event.TimeMS {
@@ -119,7 +120,12 @@ func validateAndProcessSong(s *model.Song) error {
 				}
 			}
 
-			// Se ainda assim não temos duração (ex: último evento ou sem timestamps), usamos o padrão do BPM
+			// 2. Se ainda não tem, herda a duração do evento anterior (comportamento comum em sequenciadores)
+			if event.DurationMS <= 0 && i > 0 {
+				event.DurationMS = s.Timeline[i-1].DurationMS
+			}
+
+			// 3. Se ainda assim não temos duração (ex: primeiro evento sem nada), usamos o padrão do BPM
 			if event.DurationMS <= 0 {
 				event.DurationMS = defaultDurationMS
 			}
