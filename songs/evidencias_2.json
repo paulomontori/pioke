@@ -8,93 +8,54 @@
   },
   "timeline": [
     {
-      "timestamp": "00:00.000",
-      "time_ms": 0,
-      "duration_ms": 297,
       "chord": "E",
       "lyric": "[INTRO]"
     },
     {
-      "timestamp": "00:00.198",
-      "time_ms": 297,
-      "duration_ms": 297,
       "chord": "E5+",
       "lyric": "[INTRO]"
     },
     {
-      "timestamp": "00:00.396",
-      "time_ms": 594,
-      "duration_ms": 297,
       "chord": "A",
       "lyric": "[INTRO]"
     },
     {
-      "timestamp": "00:00.594",
-      "time_ms": 891,
-      "duration_ms": 297,
       "chord": "F#m",
       "lyric": "[INTRO]"
     },
     {
-      "timestamp": "00:00.792",
-      "time_ms": 1188,
-      "duration_ms": 297,
       "chord": "A/B",
       "lyric": "[INTRO]"
     },
     {
-      "timestamp": "00:00.990",
-      "time_ms": 1485,
-      "duration_ms": 297,
       "chord": "E",
       "lyric": "[INTRO]"
     },
     {
-      "timestamp": "00:01.188",
-      "time_ms": 1782,
-      "duration_ms": 297,
       "chord": "E5+",
       "lyric": "[INTRO]"
     },
     {
-      "timestamp": "00:01.386",
-      "time_ms": 2079,
-      "duration_ms": 297,
       "chord": "A",
       "lyric": "[INTRO]"
     },
     {
-      "timestamp": "00:01.584",
-      "time_ms": 2376,
-      "duration_ms": 297,
       "chord": "E/G#",
       "lyric": "[INTRO]"
     },
     {
-      "timestamp": "00:01.782",
-      "time_ms": 2673,
-      "duration_ms": 297,
       "chord": "F#m",
       "lyric": "[INTRO]"
     },
     {
-      "timestamp": "00:01.980",
-      "time_ms": 2970,
-      "duration_ms": 297,
       "chord": "A/B",
       "lyric": "[INTRO]"
     },
     {
-      "timestamp": "00:02.178",
-      "time_ms": 3267,
-      "duration_ms": 297,
       "chord": "E",
       "lyric": "[INTRO]"
     },
     {
-      "timestamp": "00:02.376",
-      "time_ms": 3564,
-      "duration_ms": 297,
       "chord": "A/B",
       "lyric": "[INTRO]"
     }
