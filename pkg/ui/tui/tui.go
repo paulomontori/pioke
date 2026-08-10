@@ -98,8 +98,11 @@ func (t *TerminalUI) DisplayHeader(s *model.Song) {
 	}
 }
 
-func (t *TerminalUI) RenderTick(event model.PlaybackEvent) error {
-	t.HandleEvent(event)
+func (t *TerminalUI) RenderTick(event ui.PlaybackEvent) error {
+	t.HandleEvent(model.PlaybackEvent{
+		Song:        event.Song,
+		ActiveEvent: event.Current,
+	})
 	return nil
 }
 
