@@ -80,11 +80,11 @@ func validateAndProcessSong(s *model.Song) error {
 		}
 	}
 
-	// Calcula a duração padrão de 1 compasso baseado no BPM e Time Signature
+	// Calcula a duração padrão de 1 compasso baseado no BPM e Time Signature com precisão float64
 	var defaultDurationMS int64 = 2000
 	if bpm > 0 {
-		beatDurationMS := int64(60000 / bpm)
-		defaultDurationMS = beatDurationMS * int64(beatsPerMeasure)
+		beatDurationMS := 60000.0 / float64(bpm)
+		defaultDurationMS = int64(beatDurationMS * float64(beatsPerMeasure))
 	}
 
 	var accumulatedTimeMS int64 = 0
