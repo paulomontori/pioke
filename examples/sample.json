@@ -1,0 +1,61 @@
+{
+  "metadata": {
+    "title": "Hotel California",
+    "artist": "Eagles",
+    "bpm": 75,
+    "key": "Bm",
+    "time_signature": "4/4"
+  },
+  "timeline": [
+    {
+      "timestamp": "00:00.00",
+      "chord": {
+        "name": "Bm",
+        "duration": "2b"
+      }
+    },
+    {
+      "timestamp": "00:02.00",
+      "chord": {
+        "name": "F#7",
+        "duration": "2b"
+      }
+    },
+    {
+      "timestamp": "00:04.00",
+      "lyrics": {
+        "text": "On a dark desert highway",
+        "syllables": [
+          {
+            "text": "On ",
+            "timestamp": "00:04.00"
+          },
+          {
+            "text": "a ",
+            "timestamp": "00:04.30"
+          },
+          {
+            "text": "dark ",
+            "timestamp": "00:04.60"
+          },
+          {
+            "text": "de-",
+            "timestamp": "00:05.10"
+          },
+          {
+            "text": "sert ",
+            "timestamp": "00:05.40"
+          },
+          {
+            "text": "high-",
+            "timestamp": "00:05.80"
+          },
+          {
+            "text": "way",
+            "timestamp": "00:06.20"
+          }
+        ]
+      }
+    }
+  ]
+}
