@@ -57,14 +57,34 @@ func validateAndProcessSong(s *model.Song) error {
 		return fmt.Errorf("metadado obrigatório 'title' está ausente")
 	}
 
-	// Calcula a duração padrão de 1 batida baseada no BPM (se existir)
-	var defaultDurationMS int64 = 2000
+	// Obtém BPM
 	bpm := s.BPM
 	if bpm == 0 {
 		bpm = s.Metadata.BPM
 	}
+
+	// Obtém Time Signature (Fórmula de Compasso)
+	timeSig := s.TimeSig
+	if timeSig == "" {
+		timeSig = s.Metadata.TimeSig
+	}
+
+	// Define batidas por compasso padrão (4/4)
+	beatsPerMeasure := 4
+	if timeSig != "" {
+		parts := strings.Split(timeSig, "/")
+		if len(parts) >= 1 {
+			if b, err := strconv.Atoi(parts[0]); err == nil && b > 0 {
+				beatsPerMeasure = b
+			}
+		}
+	}
+
+	// Calcula a duração padrão de 1 compasso baseado no BPM e Time Signature
+	var defaultDurationMS int64 = 2000
 	if bpm > 0 {
-		defaultDurationMS = int64(60000 / bpm)
+		beatDurationMS := int64(60000 / bpm)
+		defaultDurationMS = beatDurationMS * int64(beatsPerMeasure)
 	}
 
 	var accumulatedTimeMS int64 = 0
@@ -86,7 +106,7 @@ func validateAndProcessSong(s *model.Song) error {
 			event.TimeMS = accumulatedTimeMS
 		}
 
-		// 3. Se não tem duração definida, usa a duração de 1 batida do BPM
+		// 3. Se não tem duração definida, usa a duração de 1 compasso calculada
 		if event.DurationMS <= 0 {
 			event.DurationMS = defaultDurationMS
 		}
