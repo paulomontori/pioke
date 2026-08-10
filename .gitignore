@@ -1,5 +1,19 @@
 # Binários e builds
 *.exe
-*.exe;
 *.dll
 *.so
+*.dylib
+bin/
+dist/
+
+# Ambientes virtuais e pacotes Python
+.venv/
+venv/
+ENV/
+
+# Arquivos de log e temporários
+*.log
+errors.txt
+
+# Imagens de rascunho / design local
+pioke_logo.png
