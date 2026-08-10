@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"opentune/song"
+	"opentune/pkg/model"
 )
 
 // PlaybackState representa o estado atual da reprodução
@@ -18,28 +18,28 @@ const (
 
 // Engine gerencia o ciclo de vida e tempo real de reprodução da música
 type Engine struct {
-	song       *song.Song
+	song       *model.Song
 	state      PlaybackState
 	position   time.Duration
 	ticker     *time.Ticker
 	stopChan   chan struct{}
-	eventsChan chan song.TimelineEvent
+	eventsChan chan model.TimelineEvent
 	mu         sync.Mutex
 }
 
 // NewEngine cria uma nova instância de Engine para a música informada
-func NewEngine(s *song.Song) *Engine {
+func NewEngine(s *model.Song) *Engine {
 	return &Engine{
 		song:       s,
 		state:      StateStopped,
 		position:   0,
 		stopChan:   make(chan struct{}),
-		eventsChan: make(chan song.TimelineEvent, 100),
+		eventsChan: make(chan model.TimelineEvent, 100),
 	}
 }
 
 // Events retorna o canal de leitura para eventos da linha do tempo
-func (e *Engine) Events() <-chan song.TimelineEvent {
+func (e *Engine) Events() <-chan model.TimelineEvent {
 	return e.eventsChan
 }
 

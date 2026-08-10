@@ -9,38 +9,43 @@ import (
 	"strings"
 	"time"
 
-	"opentune/song"
+	"opentune/pkg/model"
+
+	"gopkg.in/yaml.v3"
 )
 
-// ParseSong lê um arquivo (.json), valida sua estrutura, converte marcas de tempo e carrega para a memória.
-func ParseSong(filePath string) (*song.Song, error) {
+// ParseSong lê um arquivo (.json ou .yaml), valida sua estrutura, converte marcas de tempo e carrega para a memória.
+func ParseSong(filePath string) (*model.Song, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("erro ao ler arquivo de musica: %w", err)
+		return nil, fmt.Errorf("erro ao ler arquivo de música: %w", err)
 	}
 
-	ext := filepath.Ext(filePath)
-	var s song.Song
+	ext := strings.ToLower(filepath.Ext(filePath))
+	var s model.Song
 
 	switch ext {
 	case ".json":
 		if err := json.Unmarshal(data, &s); err != nil {
 			return nil, fmt.Errorf("erro ao decodificar JSON: %w", err)
 		}
+	case ".yaml", ".yml":
+		if err := yaml.Unmarshal(data, &s); err != nil {
+			return nil, fmt.Errorf("erro ao decodificar YAML: %w", err)
+		}
 	default:
-		return nil, fmt.Errorf("formato de arquivo nao suportado: %s", ext)
+		return nil, fmt.Errorf("formato de arquivo não suportado: %s", ext)
 	}
 
 	if err := validateAndProcessSong(&s); err != nil {
-		return nil, fmt.Errorf("falha na validacao e processamento da musica: %w", err)
+		return nil, fmt.Errorf("falha na validação e processamento da música: %w", err)
 	}
 
 	return &s, nil
 }
 
-// validateAndProcessSong valida campos obrigatorios e converte timestamps de string para time.Duration
-func validateAndProcessSong(s *song.Song) error {
-	// Normaliza metadados no topo ou em Metadata
+// validateAndProcessSong valida campos obrigatórios e converte timestamps para time.Duration
+func validateAndProcessSong(s *model.Song) error {
 	if s.Title == "" && s.Metadata.Title != "" {
 		s.Title = s.Metadata.Title
 	}
@@ -49,7 +54,7 @@ func validateAndProcessSong(s *song.Song) error {
 	}
 
 	if s.Title == "" && s.Metadata.Title == "" {
-		return fmt.Errorf("metadado obrigatorio 'title' esta ausente")
+		return fmt.Errorf("metadado obrigatório 'title' está ausente")
 	}
 
 	for i := range s.Timeline {
@@ -59,7 +64,7 @@ func validateAndProcessSong(s *song.Song) error {
 		} else if event.Timestamp != "" {
 			d, err := parseTimestamp(event.Timestamp)
 			if err != nil {
-				return fmt.Errorf("timestamp invalido na linha do tempo [%s]: %w", event.Timestamp, err)
+				return fmt.Errorf("timestamp inválido na linha do tempo [%s]: %w", event.Timestamp, err)
 			}
 			event.Duration = d
 		}
@@ -78,16 +83,16 @@ func parseTimestamp(ts string) (time.Duration, error) {
 	if len(parts) == 2 {
 		minutes, err = strconv.ParseFloat(parts[0], 64)
 		if err != nil {
-			return 0, fmt.Errorf("minutos invalidos: %w", err)
+			return 0, fmt.Errorf("minutos inválidos: %w", err)
 		}
 		seconds, err = strconv.ParseFloat(parts[1], 64)
 		if err != nil {
-			return 0, fmt.Errorf("segundos invalidos: %w", err)
+			return 0, fmt.Errorf("segundos inválidos: %w", err)
 		}
 	} else if len(parts) == 1 {
 		seconds, err = strconv.ParseFloat(parts[0], 64)
 		if err != nil {
-			return 0, fmt.Errorf("segundos invalidos: %w", err)
+			return 0, fmt.Errorf("segundos inválidos: %w", err)
 		}
 	} else {
 		return 0, fmt.Errorf("formato de timestamp desconhecido")

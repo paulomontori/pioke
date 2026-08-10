@@ -48,7 +48,7 @@ func main() {
 		done <- true
 	}()
 
-	// Aguarda a execução da demonstração
+	// Aguarda a execução do protótipo
 	time.Sleep(16 * time.Second)
 	eng.Stop()
 	fmt.Println("\nReprodução concluída.")

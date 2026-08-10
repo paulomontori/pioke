@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"opentune/song"
+	"opentune/pkg/model"
 )
 
 // TerminalUI gerencia a exibição do karaokê na linha de comando
@@ -16,7 +16,7 @@ func NewTerminalUI() *TerminalUI {
 }
 
 // DisplayHeader exibe o cabeçalho da música
-func (ui *TerminalUI) DisplayHeader(s *song.Song) {
+func (ui *TerminalUI) DisplayHeader(s *model.Song) {
 	fmt.Printf("========================================\n")
 	fmt.Printf("   OpenTune / MicroMelody Karaoke\n")
 	fmt.Printf("   Música: %s - %s\n", s.Title, s.Artist)
@@ -27,7 +27,7 @@ func (ui *TerminalUI) DisplayHeader(s *song.Song) {
 }
 
 // RenderEvent exibe a letra e o acorde sincronizados em tempo real
-func (ui *TerminalUI) RenderEvent(event song.TimelineEvent) {
+func (ui *TerminalUI) RenderEvent(event model.TimelineEvent) {
 	currentTime := event.Duration / time.Millisecond
 
 	chord := event.ChordStr
