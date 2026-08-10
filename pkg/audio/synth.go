@@ -1,37 +1,51 @@
 package audio
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"strings"
 	"time"
 
-	"github.com/gopxl/beep/v2"
-	"github.com/gopxl/beep/v2/speaker"
+	"github.com/hajimehoshi/oto/v3"
 )
 
-// Synth representa o sintetizador de áudio/acordes com suporte a mixagem de amostras PCM
+const (
+	sampleRate      = 44100
+	channelCount    = 2
+	bytesPerSample  = 2 // 16-bit PCM
+)
+
+// Synth representa o sintetizador de áudio utilizando a biblioteca Oto v3
 type Synth struct {
-	enabled    bool
-	sampleRate beep.SampleRate
+	context *oto.Context
+	enabled bool
 }
 
-// NewSynth cria uma nova instância de Synth e inicializa o dispositivo de áudio
+// NewSynth inicializa o contexto de áudio do Oto v3
 func NewSynth() *Synth {
-	sr := beep.SampleRate(44100)
-	err := speaker.Init(sr, sr.N(time.Second/10))
-	if err != nil {
-		fmt.Printf("[AUDIO SYNTH] Erro ao inicializar o alto-falante: %v\n", err)
-		return &Synth{enabled: false, sampleRate: sr}
+	op := &oto.NewContextOptions{
+		SampleRate:   sampleRate,
+		ChannelCount: channelCount,
+		Format:       oto.FormatSignedInt16LE,
 	}
+
+	otoCtx, ready, err := oto.NewContext(op)
+	if err != nil {
+		fmt.Printf("[AUDIO SYNTH] Erro ao criar contexto Oto: %v\n", err)
+		return &Synth{enabled: false}
+	}
+
+	<-ready
 
 	return &Synth{
-		enabled:    true,
-		sampleRate: sr,
+		context: otoCtx,
+		enabled: true,
 	}
 }
 
-// PlayChord sintetiza e executa o acorde em tempo real usando mixagem de frequências
+// PlayChord sintetiza o acorde em PCM e executa no contexto do Oto v3
 func (s *Synth) PlayChord(chord string) {
 	if !s.enabled || chord == "" {
 		return
@@ -43,14 +57,14 @@ func (s *Synth) PlayChord(chord string) {
 		return
 	}
 
-	fmt.Printf("[AUDIO SYNTH] Executando acorde polifônico: %s (%v Hz)\n", chord, frequencies)
+	fmt.Printf("[AUDIO SYNTH] Executando acorde polifônico via Oto v3: %s (%v Hz)\n", chord, frequencies)
 
-	// Gera a mixagem de ondas senoidais para todas as notas do acorde
-	streamer := multiToneWave(s.sampleRate, frequencies, time.Millisecond*800)
-	speaker.Play(streamer)
+	pcmData := generatePCMChord(frequencies, time.Millisecond*800)
+	player := s.context.NewPlayer(bytes.NewReader(pcmData))
+	player.Play()
 }
 
-// getChordFrequencies converte o nome do acorde nas frequências das suas notas componentes (Hz)
+// getChordFrequencies retorna as frequências fundamentais em Hz das notas de um acorde
 func getChordFrequencies(chord string) []float64 {
 	chord = strings.TrimSpace(chord)
 	switch chord {
@@ -79,44 +93,42 @@ func getChordFrequencies(chord string) []float64 {
 	case "F#7":
 		return []float64{369.99, 466.16, 554.37, 659.25} // F#4, A#4, C#5, E5
 	default:
-		return []float64{440.00} // Tom padrão (A4)
+		return []float64{440.00}
 	}
 }
 
-// multiToneWave mixa múltiplas frequências no buffer PCM
-func multiToneWave(sr beep.SampleRate, freqs []float64, duration time.Duration) beep.Streamer {
-	length := sr.N(duration)
+// generatePCMChord gera amostras PCM de 16-bit Little Endian para o grupo de frequências
+func generatePCMChord(freqs []float64, duration time.Duration) []byte {
+	numSamples := int(float64(sampleRate) * duration.Seconds())
+	buf := new(bytes.Buffer)
+
 	steps := make([]float64, len(freqs))
 	for i, f := range freqs {
-		steps[i] = 2 * math.Pi * f / float64(sr)
+		steps[i] = 2 * math.Pi * f / float64(sampleRate)
 	}
-	i := 0
 
-	return beep.StreamerFunc(func(samples [][2]float64) (n int, ok bool) {
-		for j := range samples {
-			if i >= length {
-				return j, false
-			}
-
-			var mixedSample float64
-			for _, step := range steps {
-				mixedSample += math.Sin(step * float64(i))
-			}
-			mixedSample = mixedSample / float64(len(freqs)) // Normalização do volume
-
-			// Envelope suave de ataque e decaimento (Fade In / Fade Out)
-			fade := 1.0
-			if i < 200 {
-				fade = float64(i) / 200.0
-			} else if i > length-200 {
-				fade = float64(length-i) / 200.0
-			}
-
-			finalVal := mixedSample * 0.3 * fade
-			samples[j][0] = finalVal
-			samples[j][1] = finalVal
-			i++
+	for i := 0; i < numSamples; i++ {
+		var mixed float64
+		for _, step := range steps {
+			mixed += math.Sin(step * float64(i))
 		}
-		return len(samples), true
-	})
+		mixed = mixed / float64(len(freqs))
+
+		// Application de fade-in e fade-out (envelope simples)
+		fade := 1.0
+		if i < 500 {
+			fade = float64(i) / 500.0
+		} else if i > numSamples-500 {
+			fade = float64(numSamples-i) / 500.0
+		}
+
+		// Escala para PCM de 16-bits (Int16)
+		sampleValue := int16(mixed * 0.3 * fade * 32767.0)
+
+		// Canal esquerdo e direito (estéreo)
+		_ = binary.Write(buf, binary.LittleEndian, sampleValue)
+		_ = binary.Write(buf, binary.LittleEndian, sampleValue)
+	}
+
+	return buf.Bytes()
 }
