@@ -1,0 +1,38 @@
+title: "Parabéns a Você"
+artist: "Domínio Público"
+bpm: 120
+key: "C"
+time_signature: "3/4"
+timeline:
+  - time_ms: 0
+    duration_ms: 3000
+    chord: "C"
+    lyric: "Parabéns pra você"
+  - time_ms: 3000
+    duration_ms: 3000
+    chord: "G7"
+    lyric: "Nesta data querida"
+  - time_ms: 6000
+    duration_ms: 3000
+    chord: "G7"
+    lyric: "Muitas felicidades"
+  - time_ms: 9000
+    duration_ms: 3000
+    chord: "C"
+    lyric: "Muitos anos de vida"
+  - time_ms: 12000
+    duration_ms: 3000
+    chord: "C"
+    lyric: "Parabéns pra você"
+  - time_ms: 15000
+    duration_ms: 3000
+    chord: "C7"
+    lyric: "Nesta data querida"
+  - time_ms: 18000
+    duration_ms: 3000
+    chord: "F"
+    lyric: "Muitas felicidades"
+  - time_ms: 21000
+    duration_ms: 3000
+    chord: "C"
+    lyric: "Muitos anos de vida"
