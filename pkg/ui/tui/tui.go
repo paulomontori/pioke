@@ -99,8 +99,10 @@ func (t *TerminalUI) DisplayHeader(s *model.Song) {
 }
 
 func (t *TerminalUI) RenderTick(event ui.PlaybackEvent) error {
+	if event.Song != nil {
+		t.model.Song = event.Song
+	}
 	t.HandleEvent(model.PlaybackEvent{
-		Song:        event.Song,
 		ActiveEvent: event.Current,
 	})
 	return nil
