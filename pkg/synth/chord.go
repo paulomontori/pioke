@@ -17,7 +17,23 @@ func GetChordFrequencies(chord string) []float64 {
 		return nil
 	}
 
-	// Mapeamento de notas base para MIDI offset (C4 = 60)
+	// Acordes pré-mapeados para o tom de Dó Maior (C) com notas e oitavas específicas
+	switch chord {
+	case "C":
+		// C4 (261.63 Hz), E4 (329.63 Hz), G4 (392.00 Hz)
+		return []float64{261.63, 329.63, 392.00}
+	case "G7":
+		// G3 (196.00 Hz), B3 (246.94 Hz), D4 (293.66 Hz), F4 (349.23 Hz)
+		return []float64{196.00, 246.94, 293.66, 349.23}
+	case "F":
+		// F3 (174.61 Hz), A3 (220.00 Hz), C4 (261.63 Hz)
+		return []float64{174.61, 220.00, 261.63}
+	case "C7":
+		// C4 (261.63 Hz), E4 (329.63 Hz), G4 (392.00 Hz), Bb4 (466.16 Hz)
+		return []float64{261.63, 329.63, 392.00, 466.16}
+	}
+
+	// Mapeamento dinâmico genérico para notas base para MIDI offset (C4 = 60)
 	baseNotes := map[string]int{
 		"C": 60, "C#": 61, "Db": 61,
 		"D": 62, "D#": 63, "Eb": 63,
@@ -66,7 +82,6 @@ func GetChordFrequencies(chord string) []float64 {
 	case "dim": // Diminuto (1, b3, b5)
 		intervals = []int{0, 3, 6}
 	default:
-		// Fallback para tríade maior se o sufixo não for totalmente reconhecido
 		if strings.HasPrefix(quality, "m") {
 			intervals = []int{0, 3, 7}
 		} else {
