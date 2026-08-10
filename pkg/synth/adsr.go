@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math"
-	"strings"
 	"time"
 )
 
@@ -26,39 +25,6 @@ type ADSR struct {
 // Fórmula: f = 440 * 2^((n - 69) / 12)
 func NoteFrequency(midiNote int) float64 {
 	return 440.0 * math.Pow(2.0, float64(midiNote-69)/12.0)
-}
-
-// GetChordFrequencies retorna as frequências calculadas das notas de um acorde
-func GetChordFrequencies(chord string) []float64 {
-	chord = strings.TrimSpace(chord)
-	switch chord {
-	case "C":
-		return []float64{NoteFrequency(60), NoteFrequency(64), NoteFrequency(67)} // C4, E4, G4
-	case "D":
-		return []float64{NoteFrequency(62), NoteFrequency(66), NoteFrequency(69)} // D4, F#4, A4
-	case "E":
-		return []float64{NoteFrequency(64), NoteFrequency(68), NoteFrequency(71)} // E4, G#4, B4
-	case "Em":
-		return []float64{NoteFrequency(64), NoteFrequency(67), NoteFrequency(71)} // E4, G4, B4
-	case "F":
-		return []float64{NoteFrequency(65), NoteFrequency(69), NoteFrequency(72)} // F4, A4, C5
-	case "G":
-		return []float64{NoteFrequency(67), NoteFrequency(71), NoteFrequency(74)} // G4, B4, D5
-	case "G#m":
-		return []float64{NoteFrequency(68), NoteFrequency(71), NoteFrequency(75)} // G#4, B4, D#5
-	case "A":
-		return []float64{NoteFrequency(69), NoteFrequency(73), NoteFrequency(76)} // A4, C#5, E5
-	case "Am":
-		return []float64{NoteFrequency(69), NoteFrequency(72), NoteFrequency(76)} // A4, C5, E5
-	case "B":
-		return []float64{NoteFrequency(71), NoteFrequency(75), NoteFrequency(78)} // B4, D#5, F#5
-	case "Bm":
-		return []float64{NoteFrequency(71), NoteFrequency(74), NoteFrequency(78)} // B4, D5, F#5
-	case "F#7":
-		return []float64{NoteFrequency(66), NoteFrequency(70), NoteFrequency(73), NoteFrequency(76)} // F#4, A#4, C#5, E5
-	default:
-		return []float64{440.00}
-	}
 }
 
 // GeneratePCMWithADSR gera amostras estéreo PCM de 16-bit com envelope ADSR
