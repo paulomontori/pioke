@@ -69,6 +69,11 @@ func NewTerminalUI() *TerminalUI {
 	}
 }
 
+// NewTUI cria uma nova instância de TerminalUI
+func NewTUI() *TerminalUI {
+	return NewTerminalUI()
+}
+
 func (t *TerminalUI) SetLibrary(lib *song.Library) {
 	t.library = lib
 }
