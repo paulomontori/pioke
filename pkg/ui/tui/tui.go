@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"pioke/pkg/model"
+	"pioke/pkg/song"
 	"pioke/pkg/ui"
 )
 
@@ -14,6 +15,7 @@ type TerminalUI struct {
 	program *tea.Program
 	model   Model
 	ctx     context.Context
+	library *song.Library
 }
 
 func NewTerminalUI() *TerminalUI {
@@ -22,8 +24,23 @@ func NewTerminalUI() *TerminalUI {
 	}
 }
 
+func (t *TerminalUI) SetLibrary(lib *song.Library) {
+	t.library = lib
+}
+
 func (t *TerminalUI) Init(ctx context.Context) error {
 	t.ctx = ctx
+	if t.library != nil {
+		if items, err := t.library.Scan(); err == nil && len(items) > 0 {
+			// Carrega a primeira música encontrada por padrão se nenhuma tiver sido definida
+			if t.model.Song == nil {
+				if s, err := t.library.GetSong(items[0].FilePath); err == nil {
+					t.model.Song = s
+				}
+			}
+		}
+	}
+
 	t.program = tea.NewProgram(t.model, tea.WithAltScreen())
 	return nil
 }

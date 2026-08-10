@@ -2,6 +2,7 @@ package audio
 
 import (
 	"io"
+	"sync"
 
 	"pioke/pkg/synth"
 )
@@ -14,14 +15,27 @@ const (
 // PCMStream encapsula um leitor de amostras em formato de bytes para consumo de drivers de som
 type PCMStream struct {
 	synth synth.Synthesizer
+	mu    sync.Mutex
 }
 
 func NewPCMStream(s synth.Synthesizer) *PCMStream {
 	return &PCMStream{synth: s}
 }
 
+// Reset limpa buffers pendentes e interrompe a síntese atual
+func (p *PCMStream) Reset() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.synth != nil {
+		p.synth.Stop()
+	}
+}
+
 // Read lê amostras sintetizadas e converte float32 PCM em bytes (LittleEndian 16-bit PCM)
 func (p *PCMStream) Read(b []byte) (n int, err error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	numSamples := len(b) / 2
 	if numSamples == 0 {
 		return 0, nil

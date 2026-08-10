@@ -2,6 +2,7 @@ package audio
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"pioke/pkg/model"
@@ -12,6 +13,7 @@ import (
 type AudioPlayer struct {
 	synth           synth.Synthesizer
 	lastChordPlayed string
+	mu              sync.Mutex
 }
 
 func NewAudioPlayer(s synth.Synthesizer) *AudioPlayer {
@@ -20,21 +22,33 @@ func NewAudioPlayer(s synth.Synthesizer) *AudioPlayer {
 	}
 }
 
+// Reset para a execução atual e reinicia o estado de acordes
+func (p *AudioPlayer) Reset() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.lastChordPlayed = ""
+	if p.synth != nil {
+		p.synth.Stop()
+	}
+}
+
 // Listen consome eventos do canal de reprodução de forma não-bloqueante
 func (p *AudioPlayer) Listen(ctx context.Context, events <-chan model.PlaybackEvent) {
 	for {
 		select {
 		case <-ctx.Done():
-			p.synth.Stop()
+			p.Reset()
 			return
 		case ev, ok := <-events:
 			if !ok {
-				p.synth.Stop()
+				p.Reset()
 				return
 			}
 
+			p.mu.Lock()
 			if ev.State != model.PLAYING {
 				p.lastChordPlayed = ""
+				p.mu.Unlock()
 				continue
 			}
 
@@ -46,9 +60,12 @@ func (p *AudioPlayer) Listen(ctx context.Context, events <-chan model.PlaybackEv
 					if dur <= 0 {
 						dur = 2 * time.Second
 					}
-					p.synth.PlayChord(chord, dur)
+					if p.synth != nil {
+						p.synth.PlayChord(chord, dur)
+					}
 				}
 			}
+			p.mu.Unlock()
 		}
 	}
 }
