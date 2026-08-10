@@ -102,7 +102,8 @@ func validateAndProcessSong(s *model.Song) error {
 		}
 
 		// 2. Se não tem TimeMS nem Timestamp, calcula com base na posição sequencial
-		if event.TimeMS == 0 && event.Timestamp == "" {
+		// Usamos i > 0 para garantir que o primeiro evento comece em 0 se não especificado
+		if event.TimeMS == 0 && event.Timestamp == "" && i > 0 {
 			event.TimeMS = accumulatedTimeMS
 		}
 
@@ -111,8 +112,8 @@ func validateAndProcessSong(s *model.Song) error {
 			event.DurationMS = defaultDurationMS
 		}
 
-		// 4. Preenche Duration (time.Duration) a partir do DurationMS (duração real da nota)
-		event.Duration = time.Duration(event.DurationMS) * time.Millisecond
+		// 4. Preenche Duration (time.Duration) a partir do TimeMS (usado como start time no sistema)
+		event.Duration = time.Duration(event.TimeMS) * time.Millisecond
 
 		// 5. Preenche o Timestamp em string caso esteja vazio (útil para UI)
 		if event.Timestamp == "" {
@@ -122,8 +123,7 @@ func validateAndProcessSong(s *model.Song) error {
 			event.Timestamp = fmt.Sprintf("%02d:%05.2f", mins, secs)
 		}
 
-		// 6. Atualiza o tempo acumulado para o próximo evento (garante que o próximo comece após este terminar)
-		// Usamos o TimeMS atual + a duração para evitar desvios caso o TimeMS tenha sido forçado no JSON
+		// 6. Atualiza o tempo acumulado para o próximo evento
 		accumulatedTimeMS = event.TimeMS + event.DurationMS
 	}
 
