@@ -1,123 +1,188 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
-	"path/filepath"
-	"syscall"
+	"strings"
+	"sync"
 	"time"
 
 	"pioke/pkg/audio"
 	"pioke/pkg/engine"
-	"pioke/pkg/model"
-	"pioke/pkg/parser"
+	"pioke/pkg/song"
 	"pioke/pkg/synth"
+	"pioke/pkg/ui"
+	"pioke/pkg/ui/tui"
+	"pioke/pkg/model"
 )
 
 func main() {
-	filePathFlag := flag.String("file", "", "Caminho do arquivo de música em formato JSON")
-	noAudioFlag := flag.Bool("no-audio", false, "Desabilita a inicialização e saída do motor de áudio")
+	var outputFile string
+	flag.StringVar(&outputFile, "out", "", "Caminho do arquivo WAV de saída para salvar o áudio gerado (ex: output.wav)")
 	flag.Parse()
 
-	filePath := *filePathFlag
-	if filePath == "" {
-		if flag.NArg() > 0 {
-			filePath = flag.Arg(0)
-		} else {
-			filePath = filepath.Join("songs", "evidencias.json")
+	// Fallback para capturar a flag -out caso tenha sido informada após argumentos posicionais
+	if outputFile == "" {
+		for i, arg := range os.Args {
+			if (arg == "-out" || arg == "--out") && i+1 < len(os.Args) {
+				outputFile = os.Args[i+1]
+				break
+			} else if strings.HasPrefix(arg, "-out=") {
+				outputFile = strings.TrimPrefix(arg, "-out=")
+				break
+			} else if strings.HasPrefix(arg, "--out=") {
+				outputFile = strings.TrimPrefix(arg, "--out=")
+				break
+			}
 		}
 	}
 
-	fmt.Printf("Carregando música: %s\n", filePath)
-	song, err := parser.LoadJSON(filePath)
+	sampleFile := "songs/parabens.yaml"
+	for _, arg := range os.Args[1:] {
+		if !strings.HasPrefix(arg, "-") && arg != outputFile {
+			sampleFile = arg
+			break
+		}
+	}
+
+	s, err := song.LoadSong(sampleFile)
 	if err != nil {
-		log.Fatalf("Erro ao carregar música: %v\n", err)
+		log.Fatalf("Erro ao carregar a música %s: %v\n", sampleFile, err)
 	}
 
-	fmt.Println("========================================")
-	fmt.Printf("   Música: %s\n", song.Title)
-	fmt.Printf("   Artista: %s\n", song.Artist)
-	if song.BPM > 0 {
-		fmt.Printf("   BPM: %d | Tom: %s\n", song.BPM, song.Key)
+	termUI := tui.NewTUI()
+	termUI.DisplayHeader(s)
+	if err := termUI.Init(); err != nil {
+		log.Fatalf("Erro ao inicializar TUI: %v\n", err)
 	}
-	fmt.Println("========================================\n")
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	audioSynth := audio.NewSynth()
+	eng := engine.NewEngine(s)
+	eng.Play()
 
-	// Trata sinais do sistema (Ctrl+C) para desligamento gracioso
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	var pcmBuffer []byte
+	var pcmMu sync.Mutex
+
+	doneChan := make(chan struct{})
+
 	go func() {
-		<-sigChan
-		fmt.Println("\nEncerrando reprodução...")
-		cancel()
+		defer close(doneChan)
+		
+		var currentEvent *model.TimelineEvent
+		var currentChord string
+		var eventStartMS int64
+		var lastTimeMS int64
+		isFirstEvent := true
+
+		for pbEvent := range eng.Events() {
+			lastTimeMS = pbEvent.CurrentTimeMS
+
+			// Se mudamos de evento na timeline (mesmo que seja o mesmo acorde, é uma nova batida/sílaba)
+			if isFirstEvent || pbEvent.ActiveEvent != currentEvent {
+				if !isFirstEvent && outputFile != "" {
+					durMS := pbEvent.CurrentTimeMS - eventStartMS
+					if durMS > 0 {
+						if currentChord != "" {
+							freqs := synth.GetChordFrequencies(currentChord)
+							if len(freqs) > 0 {
+								pcm := synth.GeneratePCMWithADSR(freqs, time.Duration(durMS)*time.Millisecond)
+								pcmMu.Lock()
+								pcmBuffer = append(pcmBuffer, pcm...)
+								pcmMu.Unlock()
+							}
+						} else {
+							// Gera silêncio para manter o tempo correto da música no WAV (Forçando Mono 16-bit)
+							numSamples := int(float64(synth.SampleRate) * float64(durMS) / 1000.0)
+							pcm := make([]byte, numSamples*2) // 2 bytes por sample (16-bit), 1 canal (Mono)
+							pcmMu.Lock()
+							pcmBuffer = append(pcmBuffer, pcm...)
+							pcmMu.Unlock()
+						}
+					}
+				}
+
+				isFirstEvent = false
+				currentEvent = pbEvent.ActiveEvent
+				eventStartMS = pbEvent.CurrentTimeMS
+				currentChord = ""
+				
+				if currentEvent != nil {
+					currentChord = currentEvent.ChordStr
+					if currentChord == "" && currentEvent.Chord != nil {
+						currentChord = currentEvent.Chord.Name
+					}
+				}
+
+				if currentChord != "" {
+					audioSynth.PlayChord(currentChord)
+				} else {
+					audioSynth.PlayChord("") // Silêncio
+				}
+			}
+
+			// Envia atualização contínua para a interface visual
+			_ = termUI.RenderTick(ui.PlaybackEvent{
+				Song:     s,
+				Current:  pbEvent.ActiveEvent,
+				Position: pbEvent.CurrentTimeMS,
+			})
+		}
+
+		// Flush do último evento quando a música terminar
+		if outputFile != "" && !isFirstEvent {
+			durMS := lastTimeMS - eventStartMS
+			if durMS <= 0 && currentEvent != nil {
+				durMS = currentEvent.DurationMS
+			}
+			if durMS <= 0 {
+				durMS = 1636 // fallback para o último acorde
+			}
+			
+			if currentChord != "" {
+				freqs := synth.GetChordFrequencies(currentChord)
+				if len(freqs) > 0 {
+					pcm := synth.GeneratePCMWithADSR(freqs, time.Duration(durMS)*time.Millisecond)
+					pcmMu.Lock()
+					pcmBuffer = append(pcmBuffer, pcm...)
+					pcmMu.Unlock()
+				}
+			} else {
+				numSamples := int(float64(synth.SampleRate) * float64(durMS) / 1000.0)
+				pcm := make([]byte, numSamples*2) // 2 bytes por sample (16-bit), 1 canal (Mono)
+				pcmMu.Lock()
+				pcmBuffer = append(pcmBuffer, pcm...)
+				pcmMu.Unlock()
+			}
+		}
 	}()
 
-	polySynth := synth.NewPolySynth(audio.DefaultSampleRate)
+	// Aguarda o término dos eventos para fechar a TUI automaticamente
+	go func() {
+		<-doneChan
+		termUI.Close()
+	}()
 
-	if !*noAudioFlag {
-		player := audio.NewAudioPlayer(polySynth)
-		// Em um ambiente com driver de som real, PCMStream enviaria para as caixas de áudio
-		engAudio := audio.NewPCMStream(polySynth)
-		_ = engAudio
+	// Inicia a TUI interativa (bloqueante)
+	_ = termUI.Run()
 
-		eng := engine.NewEngine(song)
-		go player.Listen(ctx, eng.Events())
+	eng.Stop()
 
-		runCLIPlayback(ctx, eng, song)
-	} else {
-		eng := engine.NewEngine(song)
-		runCLIPlayback(ctx, eng, song)
-	}
-
-	fmt.Println("\nExecução concluída.")
-}
-
-func runCLIPlayback(ctx context.Context, eng *engine.Engine, song *model.Song) {
-	eng.Play()
-	events := eng.Events()
-
-	lastLyric := ""
-	lastChord := ""
-
-	for {
-		select {
-		case <-ctx.Done():
-			eng.Stop()
-			return
-		case ev, ok := <-events:
-			if !ok {
-				return
+	// Gera o arquivo de áudio WAV ao término se a opção -out for definida
+	if outputFile != "" {
+		pcmMu.Lock()
+		defer pcmMu.Unlock()
+		if len(pcmBuffer) > 0 {
+			// Força a gravação do WAV como Mono (1 canal)
+			err := audio.WriteWAV(outputFile, pcmBuffer, synth.SampleRate, 1)
+			if err != nil {
+				fmt.Printf("\nErro ao salvar arquivo de áudio: %v\n", err)
+			} else {
+				fmt.Printf("\nÁudio gravado com sucesso em: %s\n", outputFile)
 			}
-
-			if ev.ActiveEvent != nil {
-				active := ev.ActiveEvent
-
-				if active.ChordStr != "" && active.ChordStr != lastChord {
-					lastChord = active.ChordStr
-					fmt.Printf("\n[Acorde: %s]\n", lastChord)
-				}
-
-				if active.Lyric != "" && active.Lyric != lastLyric {
-					lastLyric = active.Lyric
-					secs := float64(ev.CurrentTimeMS) / 1000.0
-					fmt.Printf("[%02d:%05.2f] Letra: %s\n", int(secs)/60, float64(int(secs)%60)+secs-float64(int(secs)), lastLyric)
-				}
-			}
-
-			// Aguarda uma pequena pausa se a música tiver chegado ao fim da timeline
-			if eng.State() == model.STOPPED {
-				return
-			}
-		case <-time.After(500 * time.Millisecond):
-			if eng.State() != model.PLAYING {
-				return
-			}
+		} else {
+			fmt.Println("\nNenhum áudio gerado para gravar.")
 		}
 	}
 }
