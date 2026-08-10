@@ -5,46 +5,46 @@ key: "C"
 time_signature: "3/4"
 timeline:
   - time_ms: 0
-    duration_ms: 2000
+    duration_ms: 1636
     chord: "C"
     lyric: "Parabéns pra você"
 
-  - time_ms: 2000
-    duration_ms: 2000
+  - time_ms: 1636
+    duration_ms: 1636
     chord: "G7"
     lyric: "Nesta data querida"
 
-  - time_ms: 4000
-    duration_ms: 2000
+  - time_ms: 3272
+    duration_ms: 1636
     chord: "G7"
     lyric: "Muitas felicidades"
 
-  - time_ms: 6000
-    duration_ms: 2000
+  - time_ms: 4908
+    duration_ms: 1636
     chord: "C"
     lyric: "Muitos anos de vida"
 
-  - time_ms: 8000
-    duration_ms: 2000
+  - time_ms: 6544
+    duration_ms: 1636
     chord: "C7"
     lyric: "Parabéns pra você"
 
-  - time_ms: 10000
-    duration_ms: 2000
+  - time_ms: 8180
+    duration_ms: 1636
     chord: "F"
     lyric: "Nesta data querida"
 
-  - time_ms: 12000
-    duration_ms: 2000
+  - time_ms: 9816
+    duration_ms: 1636
     chord: "C"
     lyric: "Muitas felicidades"
 
-  - time_ms: 14000
-    duration_ms: 2000
+  - time_ms: 11452
+    duration_ms: 1636
     chord: "G7"
     lyric: "Muitos anos de..."
 
-  - time_ms: 16000
+  - time_ms: 13088
     duration_ms: 2500
     chord: "C"
     lyric: "...vida!"

@@ -68,29 +68,44 @@ func main() {
 
 	go func() {
 		defer close(doneChan)
+		
+		var currentChord string
+		var chordStartMS int64
+		var lastTimeMS int64
+
 		for pbEvent := range eng.Events() {
+			lastTimeMS = pbEvent.CurrentTimeMS
+			chord := ""
+			
 			if pbEvent.ActiveEvent != nil {
-				chord := pbEvent.ActiveEvent.ChordStr
+				chord = pbEvent.ActiveEvent.ChordStr
 				if chord == "" && pbEvent.ActiveEvent.Chord != nil {
 					chord = pbEvent.ActiveEvent.Chord.Name
 				}
-				if chord != "" {
-					audioSynth.PlayChord(chord)
+			}
+
+			// Se o acorde mudou, renderiza o acorde anterior com a duração exata
+			if chord != currentChord {
+				if outputFile != "" && currentChord != "" {
+					durMS := pbEvent.CurrentTimeMS - chordStartMS
+					if durMS > 0 {
+						freqs := synth.GetChordFrequencies(currentChord)
+						if len(freqs) > 0 {
+							pcm := synth.GeneratePCMWithADSR(freqs, time.Duration(durMS)*time.Millisecond)
+							pcmMu.Lock()
+							pcmBuffer = append(pcmBuffer, pcm...)
+							pcmMu.Unlock()
+						}
+					}
 				}
 
-				// Se o parâmetro -out foi informado, sintetiza e armazena as amostras PCM para o arquivo WAV
-				if outputFile != "" && chord != "" {
-					durMS := pbEvent.ActiveEvent.DurationMS
-					if durMS <= 0 {
-						durMS = 1600
-					}
-					freqs := synth.GetChordFrequencies(chord)
-					if len(freqs) > 0 {
-						pcm := synth.GeneratePCMWithADSR(freqs, time.Duration(durMS)*time.Millisecond)
-						pcmMu.Lock()
-						pcmBuffer = append(pcmBuffer, pcm...)
-						pcmMu.Unlock()
-					}
+				currentChord = chord
+				chordStartMS = pbEvent.CurrentTimeMS
+				
+				if chord != "" {
+					audioSynth.PlayChord(chord)
+				} else {
+					audioSynth.PlayChord("") // Silêncio
 				}
 			}
 
@@ -100,6 +115,21 @@ func main() {
 				Current:  pbEvent.ActiveEvent,
 				Position: pbEvent.CurrentTimeMS,
 			})
+		}
+
+		// Flush do último acorde quando a música terminar
+		if outputFile != "" && currentChord != "" {
+			durMS := lastTimeMS - chordStartMS
+			if durMS <= 0 {
+				durMS = 1636 // fallback para o último acorde
+			}
+			freqs := synth.GetChordFrequencies(currentChord)
+			if len(freqs) > 0 {
+				pcm := synth.GeneratePCMWithADSR(freqs, time.Duration(durMS)*time.Millisecond)
+				pcmMu.Lock()
+				pcmBuffer = append(pcmBuffer, pcm...)
+				pcmMu.Unlock()
+			}
 		}
 	}()
 
@@ -119,7 +149,7 @@ func main() {
 		pcmMu.Lock()
 		defer pcmMu.Unlock()
 		if len(pcmBuffer) > 0 {
-			err := audio.WriteWAV(outputFile, pcmBuffer, synth.SampleRate, synth.ChannelCount)
+			err := audio.WriteWAV(outputFile, pcmBuffer, synth.SampleRate, 1) // 1 canal (Mono)
 			if err != nil {
 				fmt.Printf("\nErro ao salvar arquivo de áudio: %v\n", err)
 			} else {
