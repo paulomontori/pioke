@@ -82,10 +82,16 @@ func TestParseSongJSON(t *testing.T) {
 	if song.Timeline[0].DurationMS != 1000 {
 		t.Errorf("Duração do evento 0 esperada 1000ms, obtida %d", song.Timeline[0].DurationMS)
 	}
+	if song.Timeline[0].Duration != 1000*time.Millisecond {
+		t.Errorf("Duration (start time) do evento 0 esperada 1000ms, obtida %v", song.Timeline[0].Duration)
+	}
 	
 	// Evento 1: Último evento, usa default (BPM 120, 4/4 -> 2000ms)
 	if song.Timeline[1].DurationMS != 2000 {
 		t.Errorf("Duração do evento 1 esperada 2000ms, obtida %d", song.Timeline[1].DurationMS)
+	}
+	if song.Timeline[1].Duration != 2000*time.Millisecond {
+		t.Errorf("Duration (start time) do evento 1 esperada 2000ms, obtida %v", song.Timeline[1].Duration)
 	}
 }
 
@@ -113,7 +119,6 @@ func TestValidateAndProcessSong_AutoCalculateTimes(t *testing.T) {
 	}
 
 	expectedDurationMS := int64(2424)
-	expectedDuration := time.Duration(expectedDurationMS) * time.Millisecond
 
 	// Evento 0
 	if song.Timeline[0].TimeMS != 0 {
@@ -122,8 +127,8 @@ func TestValidateAndProcessSong_AutoCalculateTimes(t *testing.T) {
 	if song.Timeline[0].DurationMS != expectedDurationMS {
 		t.Errorf("Evento 0: DurationMS esperado %d, obtido %d", expectedDurationMS, song.Timeline[0].DurationMS)
 	}
-	if song.Timeline[0].Duration != expectedDuration {
-		t.Errorf("Evento 0: Duration esperado %v, obtido %v", expectedDuration, song.Timeline[0].Duration)
+	if song.Timeline[0].Duration != 0 {
+		t.Errorf("Evento 0: Duration (start time) esperado 0, obtido %v", song.Timeline[0].Duration)
 	}
 	if song.Timeline[0].Chord == nil || song.Timeline[0].Chord.Name != "E" {
 		t.Errorf("Evento 0: Objeto Chord não foi preenchido corretamente")
@@ -133,8 +138,8 @@ func TestValidateAndProcessSong_AutoCalculateTimes(t *testing.T) {
 	if song.Timeline[1].TimeMS != expectedDurationMS {
 		t.Errorf("Evento 1: TimeMS esperado %d, obtido %d", expectedDurationMS, song.Timeline[1].TimeMS)
 	}
-	if song.Timeline[1].Duration != expectedDuration {
-		t.Errorf("Evento 1: Duration esperado %v, obtido %v", expectedDuration, song.Timeline[1].Duration)
+	if song.Timeline[1].Duration != time.Duration(expectedDurationMS)*time.Millisecond {
+		t.Errorf("Evento 1: Duration (start time) esperado %v, obtido %v", time.Duration(expectedDurationMS)*time.Millisecond, song.Timeline[1].Duration)
 	}
 
 	// Evento 2
@@ -161,15 +166,15 @@ func TestValidateAndProcessSong_ExplicitTimes(t *testing.T) {
 		t.Fatalf("Erro inesperado: %v", err)
 	}
 
-	// Verifica se os tempos foram mantidos e Duration preenchido com a duração correta
+	// Verifica se os tempos foram mantidos e Duration preenchido com o start time
 	if song.Timeline[1].TimeMS != 1636 {
 		t.Errorf("Evento 1: TimeMS foi alterado, esperado 1636, obtido %d", song.Timeline[1].TimeMS)
 	}
 	if song.Timeline[2].DurationMS != 2500 {
 		t.Errorf("Evento 2: DurationMS esperado 2500, obtido %d", song.Timeline[2].DurationMS)
 	}
-	if song.Timeline[2].Duration != 2500*time.Millisecond {
-		t.Errorf("Evento 2: Duration esperado 2500ms, obtido %v", song.Timeline[2].Duration)
+	if song.Timeline[2].Duration != 3272*time.Millisecond {
+		t.Errorf("Evento 2: Duration (start time) esperado 3272ms, obtido %v", song.Timeline[2].Duration)
 	}
 }
 
