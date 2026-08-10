@@ -95,7 +95,7 @@ func main() {
 						} else {
 							// Gera silêncio para manter o tempo correto da música no WAV
 							numSamples := int(float64(synth.SampleRate) * float64(durMS) / 1000.0)
-							pcm := make([]byte, numSamples*2) // 16-bit mono (2 bytes por sample)
+							pcm := make([]byte, numSamples*synth.BytesPerSample*synth.ChannelCount)
 							pcmMu.Lock()
 							pcmBuffer = append(pcmBuffer, pcm...)
 							pcmMu.Unlock()
@@ -150,7 +150,7 @@ func main() {
 				}
 			} else {
 				numSamples := int(float64(synth.SampleRate) * float64(durMS) / 1000.0)
-				pcm := make([]byte, numSamples*2)
+				pcm := make([]byte, numSamples*synth.BytesPerSample*synth.ChannelCount)
 				pcmMu.Lock()
 				pcmBuffer = append(pcmBuffer, pcm...)
 				pcmMu.Unlock()
@@ -174,7 +174,7 @@ func main() {
 		pcmMu.Lock()
 		defer pcmMu.Unlock()
 		if len(pcmBuffer) > 0 {
-			err := audio.WriteWAV(outputFile, pcmBuffer, synth.SampleRate, 1) // 1 canal (Mono)
+			err := audio.WriteWAV(outputFile, pcmBuffer, synth.SampleRate, synth.ChannelCount)
 			if err != nil {
 				fmt.Printf("\nErro ao salvar arquivo de áudio: %v\n", err)
 			} else {
