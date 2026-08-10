@@ -128,7 +128,15 @@ func validateAndProcessSong(s *model.Song) error {
 			event.Timestamp = fmt.Sprintf("%02d:%05.2f", mins, secs)
 		}
 
-		// 6. Atualiza o tempo acumulado para o próximo evento
+		// 6. Garante que o objeto Chord esteja preenchido para o sintetizador
+		if event.ChordStr != "" && event.Chord == nil {
+			event.Chord = &model.ChordEvent{
+				Name:     event.ChordStr,
+				Duration: fmt.Sprintf("%dms", event.DurationMS),
+			}
+		}
+
+		// 7. Atualiza o tempo acumulado para o próximo evento
 		accumulatedTimeMS = event.TimeMS + event.DurationMS
 	}
 

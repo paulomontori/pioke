@@ -125,6 +125,9 @@ func TestValidateAndProcessSong_AutoCalculateTimes(t *testing.T) {
 	if song.Timeline[0].Duration != expectedDuration {
 		t.Errorf("Evento 0: Duration esperado %v, obtido %v", expectedDuration, song.Timeline[0].Duration)
 	}
+	if song.Timeline[0].Chord == nil || song.Timeline[0].Chord.Name != "E" {
+		t.Errorf("Evento 0: Objeto Chord não foi preenchido corretamente")
+	}
 
 	// Evento 1
 	if song.Timeline[1].TimeMS != expectedDurationMS {
