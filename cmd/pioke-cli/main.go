@@ -13,6 +13,7 @@ import (
 
 	"pioke/pkg/audio"
 	"pioke/pkg/engine"
+	"pioke/pkg/model"
 	"pioke/pkg/parser"
 	"pioke/pkg/synth"
 )
@@ -77,7 +78,7 @@ func main() {
 	fmt.Println("\nExecução concluída.")
 }
 
-func runCLIPlayback(ctx context.Context, eng *engine.Engine, song interface{}) {
+func runCLIPlayback(ctx context.Context, eng *engine.Engine, song *model.Song) {
 	eng.Play()
 	events := eng.Events()
 
@@ -110,11 +111,11 @@ func runCLIPlayback(ctx context.Context, eng *engine.Engine, song interface{}) {
 			}
 
 			// Aguarda uma pequena pausa se a música tiver chegado ao fim da timeline
-			if eng.State() == engine.STOPPED {
+			if eng.State() == model.STOPPED {
 				return
 			}
 		case <-time.After(500 * time.Millisecond):
-			if eng.State() != engine.PLAYING {
+			if eng.State() != model.PLAYING {
 				return
 			}
 		}
