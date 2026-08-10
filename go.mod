@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/charmbracelet/bubbletea v0.25.0
 	github.com/charmbracelet/lipgloss v0.9.1
-	github.com/hajimehoshi/oto/v3 v3.1.0
+	github.com/ebitengine/oto/v3 v3.1.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

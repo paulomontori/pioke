@@ -7,7 +7,7 @@ import (
 
 	"pioke/pkg/synth"
 
-	"github.com/hajimehoshi/oto/v3"
+	"github.com/ebitengine/oto/v3"
 )
 
 // Synth representa a interface de saída de áudio alimentada pelo gerador de síntese

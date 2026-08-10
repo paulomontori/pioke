@@ -1,0 +1,8 @@
+pkg\audio\synth.go:10:2: missing go.sum entry for module providing package github.com/ebitengine/oto/v3 (imported by pioke/pkg/audio); to add:
+        go get pioke/pkg/audio
+pkg\parser\parser.go:14:2: missing go.sum entry for module providing package gopkg.in/yaml.v3 (imported by pioke/pkg/parser); to add:
+        go get pioke/pkg/parser
+pkg\ui\tui\tui.go:10:2: missing go.sum entry for module providing package github.com/charmbracelet/bubbletea (imported by pioke/pkg/ui/tui); to add:
+        go get pioke/pkg/ui/tui
+pkg\ui\tui\tui.go:11:2: missing go.sum entry for module providing package github.com/charmbracelet/lipgloss (imported by pioke/pkg/ui/tui); to add:
+        go get pioke/pkg/ui/tui

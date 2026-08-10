@@ -11,7 +11,7 @@ PioKe é uma engine de karaokê e sintetizador de acordes em tempo real, leve e 
 * **Parsing de Arquivos de Música:** Suporte para carregamento e validação de arquivos de música em formato **JSON** e **YAML**.
 * **Motor de Sincronização de Alta Precisão:** Loop de reprodução baseado em `time.Ticker` com precisão de milissegundos.
 * **Sintetizador de Áudio Polifônico (ADSR):** Geração de formas de onda senoidais com envelope ADSR (Attack, Decay, Sustain, Release) e cálculo de frequências musicais baseado em afinação A4 (440Hz).
-* **Pipeline de Áudio Multiplataforma:** Reprodução de amostras PCM em tempo real via **Oto v3** (`github.com/hajimehoshi/oto/v3`).
+* **Pipeline de Áudio Multiplataforma:** Reprodução de amostras PCM em tempo real via **Oto v3** (`github.com/ebitengine/oto/v3`).
 * **Camada de UI Desacoplada:** Interface `Renderer` no pacote `pkg/ui` pronta para suportar interfaces de terminal (TUI) e interfaces gráficas (GUI).
 * **Arquitetura Modular:** Separação limpa entre os pacotes `pkg/model`, `pkg/parser`, `pkg/engine`, `pkg/synth`, `pkg/audio` e `pkg/ui`.
 
