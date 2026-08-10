@@ -101,9 +101,13 @@ func validateAndProcessSong(s *model.Song) error {
 			event.TimeMS = d.Milliseconds()
 		}
 
-		// 2. Se não tem TimeMS nem Timestamp, assume que toca logo após o evento anterior
-		if event.TimeMS == 0 && event.Timestamp == "" && i > 0 {
-			event.TimeMS = accumulatedTimeMS
+		// 2. Se não tem TimeMS nem Timestamp, calcula com base na posição
+		if event.TimeMS == 0 && event.Timestamp == "" {
+			if i == 0 {
+				event.TimeMS = 0 // O primeiro evento começa em 0s
+			} else {
+				event.TimeMS = accumulatedTimeMS // Os seguintes começam após o anterior
+			}
 		}
 
 		// 3. Se não tem duração definida, usa a duração de 1 compasso calculada
