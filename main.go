@@ -9,7 +9,7 @@ import (
 	"pioke/pkg/audio"
 	"pioke/pkg/engine"
 	"pioke/pkg/parser"
-	"pioke/pkg/ui"
+	"pioke/pkg/ui/tui"
 )
 
 func main() {
@@ -18,25 +18,22 @@ func main() {
 		sampleFile = os.Args[1]
 	}
 
-	fmt.Printf("Carregando música de %s...\n", sampleFile)
 	s, err := parser.ParseSong(sampleFile)
 	if err != nil {
 		log.Fatalf("Erro ao carregar a música: %v\n", err)
 	}
 
-	var renderer ui.Renderer = ui.NewTerminalUI()
-	if err := renderer.Init(); err != nil {
-		log.Fatalf("Erro ao inicializar UI: %v\n", err)
+	termUI := tui.NewTUI()
+	termUI.DisplayHeader(s)
+	if err := termUI.Init(); err != nil {
+		log.Fatalf("Erro ao inicializar TUI: %v\n", err)
 	}
-	defer renderer.Close()
-
-	renderer.DisplayHeader(s)
+	defer termUI.Close()
 
 	synth := audio.NewSynth()
 	eng := engine.NewEngine(s)
 	eng.Start()
 
-	done := make(chan bool)
 	go func() {
 		for pbEvent := range eng.Events() {
 			if pbEvent.Current != nil {
@@ -44,18 +41,12 @@ func main() {
 				if chord == "" && pbEvent.Current.Chord != nil {
 					chord = pbEvent.Current.Chord.Name
 				}
-
-				// Toca o acorde via sintetizador de áudio
 				synth.PlayChord(chord)
 			}
-
-			// Renderiza na UI desacoplada
-			_ = renderer.RenderTick(pbEvent)
+			_ = termUI.RenderTick(pbEvent)
 		}
-		done <- true
 	}()
 
-	// Aguarda a execução do protótipo
 	time.Sleep(16 * time.Second)
 	eng.Stop()
 	fmt.Println("\nReprodução concluída.")
