@@ -2,12 +2,9 @@
 
 # Script de comandos Git para registrar as etapas do projeto PioKe
 
-# 1. Adicionar e commitar Fase 6 (Interface Gráfica Ebitengine)
-git add pkg/ui/gui/
-git commit -m "feat: adiciona interface gráfica 2D usando Ebitengine"
+echo "Executando commits do projeto PioKe..."
 
-# 2. Adicionar e commitar o CHANGELOG e scripts de atualização
-git add CHANGELOG.md tasks.md
-git commit -m "docs: atualiza documentação do projeto e historico de tarefas"
+git add -A
+git commit -m "chore: salva alteracoes pendentes de configuracao e documentacao"
 
 echo "Commits concluídos com sucesso!"
