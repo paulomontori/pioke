@@ -3,6 +3,7 @@ package parser
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -80,11 +81,11 @@ func validateAndProcessSong(s *model.Song) error {
 		}
 	}
 
-	// Calcula a duração padrão de 1 compasso baseado no BPM e Time Signature com precisão float64
+	// Calcula a duração padrão de 1 compasso baseado no BPM e Time Signature
 	var defaultDurationMS int64 = 2000
 	if bpm > 0 {
 		beatDurationMS := 60000.0 / float64(bpm)
-		defaultDurationMS = int64(beatDurationMS * float64(beatsPerMeasure))
+		defaultDurationMS = int64(math.Round(beatDurationMS * float64(beatsPerMeasure)))
 	}
 
 	var accumulatedTimeMS int64 = 0
@@ -92,8 +93,8 @@ func validateAndProcessSong(s *model.Song) error {
 	for i := range s.Timeline {
 		event := &s.Timeline[i]
 		
-		// 1. Preenche TimeMS a partir do Timestamp se necessário
-		if event.TimeMS == 0 && event.Timestamp != "" {
+		// 1. Se TimeMS está zerado mas temos um Timestamp em string, usamos ele
+		if event.TimeMS == 0 && event.Timestamp != "" && event.Timestamp != "00:00.00" {
 			d, err := parseTimestamp(event.Timestamp)
 			if err != nil {
 				return fmt.Errorf("timestamp inválido na linha do tempo [%s]: %w", event.Timestamp, err)
@@ -101,18 +102,22 @@ func validateAndProcessSong(s *model.Song) error {
 			event.TimeMS = d.Milliseconds()
 		}
 
-		// 2. Se não tem TimeMS nem Timestamp, calcula com base na posição sequencial
-		// Usamos i > 0 para garantir que o primeiro evento comece em 0 se não especificado
-		if event.TimeMS == 0 && event.Timestamp == "" && i > 0 {
-			event.TimeMS = accumulatedTimeMS
+		// 2. Se não temos TimeMS nem Timestamp, calculamos sequencialmente
+		// O evento 0 começa em 0. Os demais começam no accumulatedTimeMS.
+		if event.TimeMS == 0 && event.Timestamp == "" {
+			if i > 0 {
+				event.TimeMS = accumulatedTimeMS
+			} else {
+				event.TimeMS = 0
+			}
 		}
 
-		// 3. Se não tem duração definida, usa a duração de 1 compasso calculada
+		// 3. Se a duração não foi definida, usamos a duração calculada do compasso
 		if event.DurationMS <= 0 {
 			event.DurationMS = defaultDurationMS
 		}
 
-		// 4. Preenche Duration (time.Duration) a partir do TimeMS (usado como start time no sistema)
+		// 4. Preenche Duration (time.Duration) com o TimeMS (usado como start time no sistema)
 		event.Duration = time.Duration(event.TimeMS) * time.Millisecond
 
 		// 5. Preenche o Timestamp em string caso esteja vazio (útil para UI)

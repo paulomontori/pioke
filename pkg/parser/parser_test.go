@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"pioke/pkg/model"
 )
 
 func TestParseTimestamp(t *testing.T) {
@@ -75,10 +77,116 @@ func TestParseSongJSON(t *testing.T) {
 	if len(song.Timeline) != 2 {
 		t.Fatalf("Esperado 2 eventos na timeline, obtido %d", len(song.Timeline))
 	}
+	// O campo Duration é usado como tempo de início no sistema
 	if song.Timeline[0].Duration != time.Second {
-		t.Errorf("Duração do evento 0 esperada 1s, obtida %v", song.Timeline[0].Duration)
+		t.Errorf("Duração (início) do evento 0 esperada 1s, obtida %v", song.Timeline[0].Duration)
 	}
 	if song.Timeline[1].Duration != 2*time.Second {
-		t.Errorf("Duração do evento 1 esperada 2s, obtida %v", song.Timeline[1].Duration)
+		t.Errorf("Duração (início) do evento 1 esperada 2s, obtida %v", song.Timeline[1].Duration)
+	}
+}
+
+func TestValidateAndProcessSong_AutoCalculateTimes(t *testing.T) {
+	// Cenário 1: Música sem time_ms e duration_ms (como evidencias.json)
+	// BPM = 99, TimeSig = 4/4
+	// Duração de 1 batida = 60000 / 99 = 606.06 ms
+	// Duração de 1 compasso (4 batidas) = 2424 ms
+	song := &model.Song{
+		Metadata: model.Metadata{
+			Title:   "Evidências",
+			BPM:     99,
+			TimeSig: "4/4",
+		},
+		Timeline: []model.TimelineEvent{
+			{ChordStr: "E"},
+			{ChordStr: "E5+"},
+			{ChordStr: "A"},
+		},
+	}
+
+	err := validateAndProcessSong(song)
+	if err != nil {
+		t.Fatalf("Erro inesperado: %v", err)
+	}
+
+	expectedDurationMS := int64(2424)
+
+	// Evento 0
+	if song.Timeline[0].TimeMS != 0 {
+		t.Errorf("Evento 0: TimeMS esperado 0, obtido %d", song.Timeline[0].TimeMS)
+	}
+	if song.Timeline[0].DurationMS != expectedDurationMS {
+		t.Errorf("Evento 0: DurationMS esperado %d, obtido %d", expectedDurationMS, song.Timeline[0].DurationMS)
+	}
+	if song.Timeline[0].Duration != 0 {
+		t.Errorf("Evento 0: Duration (start time) esperado 0, obtido %v", song.Timeline[0].Duration)
+	}
+
+	// Evento 1
+	if song.Timeline[1].TimeMS != expectedDurationMS {
+		t.Errorf("Evento 1: TimeMS esperado %d, obtido %d", expectedDurationMS, song.Timeline[1].TimeMS)
+	}
+	if song.Timeline[1].Duration != time.Duration(expectedDurationMS)*time.Millisecond {
+		t.Errorf("Evento 1: Duration (start time) esperado %v, obtido %v", time.Duration(expectedDurationMS)*time.Millisecond, song.Timeline[1].Duration)
+	}
+
+	// Evento 2
+	if song.Timeline[2].TimeMS != expectedDurationMS*2 {
+		t.Errorf("Evento 2: TimeMS esperado %d, obtido %d", expectedDurationMS*2, song.Timeline[2].TimeMS)
+	}
+}
+
+func TestValidateAndProcessSong_ExplicitTimes(t *testing.T) {
+	// Cenário 2: Música com tempos explícitos (como parabens.yaml)
+	song := &model.Song{
+		Metadata: model.Metadata{
+			Title: "Parabéns",
+		},
+		Timeline: []model.TimelineEvent{
+			{TimeMS: 0, DurationMS: 1636},
+			{TimeMS: 1636, DurationMS: 1636},
+			{TimeMS: 3272, DurationMS: 2500},
+		},
+	}
+
+	err := validateAndProcessSong(song)
+	if err != nil {
+		t.Fatalf("Erro inesperado: %v", err)
+	}
+
+	// Verifica se os tempos foram mantidos e Duration preenchido como start time
+	if song.Timeline[1].TimeMS != 1636 {
+		t.Errorf("Evento 1: TimeMS foi alterado, esperado 1636, obtido %d", song.Timeline[1].TimeMS)
+	}
+	if song.Timeline[2].Duration != 3272*time.Millisecond {
+		t.Errorf("Evento 2: Duration (start time) esperado 3272ms, obtido %v", song.Timeline[2].Duration)
+	}
+	if song.Timeline[2].DurationMS != 2500 {
+		t.Errorf("Evento 2: DurationMS esperado 2500, obtido %d", song.Timeline[2].DurationMS)
+	}
+}
+
+func TestValidateAndProcessSong_StringTimestamps(t *testing.T) {
+	// Cenário 3: Música usando apenas strings de Timestamp
+	song := &model.Song{
+		Metadata: model.Metadata{
+			Title: "Teste Timestamp",
+		},
+		Timeline: []model.TimelineEvent{
+			{Timestamp: "00:01.50", DurationMS: 1000},
+			{Timestamp: "00:03.00", DurationMS: 1000},
+		},
+	}
+
+	err := validateAndProcessSong(song)
+	if err != nil {
+		t.Fatalf("Erro inesperado: %v", err)
+	}
+
+	if song.Timeline[0].TimeMS != 1500 {
+		t.Errorf("Evento 0: TimeMS esperado 1500, obtido %d", song.Timeline[0].TimeMS)
+	}
+	if song.Timeline[1].TimeMS != 3000 {
+		t.Errorf("Evento 1: TimeMS esperado 3000, obtido %d", song.Timeline[1].TimeMS)
 	}
 }
