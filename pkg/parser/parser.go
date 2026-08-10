@@ -101,13 +101,9 @@ func validateAndProcessSong(s *model.Song) error {
 			event.TimeMS = d.Milliseconds()
 		}
 
-		// 2. Se não tem TimeMS nem Timestamp, calcula com base na posição
+		// 2. Se não tem TimeMS nem Timestamp, calcula com base na posição sequencial
 		if event.TimeMS == 0 && event.Timestamp == "" {
-			if i == 0 {
-				event.TimeMS = 0 // O primeiro evento começa em 0s
-			} else {
-				event.TimeMS = accumulatedTimeMS // Os seguintes começam após o anterior
-			}
+			event.TimeMS = accumulatedTimeMS
 		}
 
 		// 3. Se não tem duração definida, usa a duração de 1 compasso calculada
@@ -126,7 +122,8 @@ func validateAndProcessSong(s *model.Song) error {
 			event.Timestamp = fmt.Sprintf("%02d:%05.2f", mins, secs)
 		}
 
-		// 6. Atualiza o tempo acumulado para o próximo evento
+		// 6. Atualiza o tempo acumulado para o próximo evento (garante que o próximo comece após este terminar)
+		// Usamos o TimeMS atual + a duração para evitar desvios caso o TimeMS tenha sido forçado no JSON
 		accumulatedTimeMS = event.TimeMS + event.DurationMS
 	}
 
