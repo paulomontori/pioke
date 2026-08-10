@@ -1,91 +1,86 @@
-# PioKe — Frontend Roadmap & UI Implementation Options
+# Prompt de Implementação — Fase 6: Interface Gráfica 2D (`pkg/ui/gui` - Ebitengine)
 
-> **Document Scope:** Interface layer options, cross-platform rendering considerations, step-by-step UI roadmap, and integration patterns for the PioKe interactive karaoke engine.
-
----
-
-## 🎨 1. Architecture & Rendering Options
-
-To maintain low latency and low CPU/RAM usage on Raspberry Pi and modest hardware, three progressive UI options are defined:
-
-| Option | Technology Stack | Best Used For | Memory Footprint | CPU Overhead |
-| :--- | :--- | :--- | :--- | :--- |
-| **Option A (MVP)** | Terminal UI (`bubbletea` / `termbox-go`) | SSH / Headless / Pi CLI | ~10 MB | Ultra Low (< 1%) |
-| **Option B (Recommended)** | Lightweight 2D Engine (`Ebitengine`) | Desktop / Raspberry Pi OS | ~35 MB | Low (1-3%) |
-| **Option C (Cross-Platform)** | Web / Mobile WebView (`Wails` / WebSockets) | Smart TVs / Android / Web | ~80 MB | Moderate |
+**Projeto:** Pioke (`github.com/paulomontori/pioke`)  
+**Linguagem:** Go (Golang)  
+**Objetivo da Task:** Implementar a interface gráfica 2D (GUI) usando a biblioteca Ebitengine (`github.com/hajimehoshi/ebiten/v2`), oferecendo uma visualização fluida e responsiva para telas desktop e Raspberry Pi OS (HDMI), com suporte a modo tela cheia, renderização de fontes customizadas e transição suave no destaque de letras e acordes.
 
 ---
 
-## 🛠️ 2. Core Frontend Dependencies (Go)
+## 📐 Visão Geral & Objetivos
 
-### 2.1 Terminal UI (Option A)
-* **`github.com/charmbracelet/bubbletea`**: Elm-architecture framework for terminal interfaces.
-  * **Role:** High-performance, reactive terminal rendering for lyric synchronization, progress bars, and chord highlights.
-* **`github.com/charmbracelet/lipgloss`**: Terminal styling engine.
-  * **Role:** Text formatting, colors, borders, and layout grids.
-
-### 2.2 Graphical 2D Engine (Option B)
-* **`github.com/hajimehoshi/ebiten/v2`**: Ultra-lightweight 2D game library for Go.
-  * **Role:** Cross-platform hardware-accelerated rendering (OpenGL/Metal/DirectX/WebGL), font rendering, screen scaling, and smooth lyric scrolling animations.
+A Fase 6 cria a experiência visual rica do Pioke. O `pkg/ui/gui` deve implementar a interface `Renderer` definida na Fase 5 e gerenciar a janela do Ebitengine:
+1. Renderizar as linhas de texto (com suporte a UTF-8/Acentuação) e posições de acordes.
+2. Animar/destacar a palavra ou sílaba atual de forma fluida (interpolação visual/smooth transition).
+3. Suportar alternância para Fullscreen, ajuste automático de resolução e escala para telas de TV/monitores via Raspberry Pi.
+4. Manter baixíssimo consumo de CPU/GPU para garantir 60 FPS estáveis no Raspberry Pi 3/4/5.
 
 ---
 
-## 🚀 3. Step-by-Step Frontend Implementation Roadmap
+## 📁 Estrutura de Arquivos a Criar / Atualizar
+
+```text
+pkg/
+└── ui/
+    └── gui/
+        ├── ebiten.go         # Implementação de ebiten.Game e do Renderer
+        ├── font.go           # Carregamento e cache de fontes TrueType/OpenType (golang.org/x/image/font)
+        ├── view.go           # Lógica de layout (cálculo de bounding box, centralização, rolagem)
+        └── gui_test.go       # Testes de inicialização e mapeamento de estado
+```
 
 ---
 
-### Step 7: UI Layer Abstraction & Renderer Interface
-* **Objective:** Decouple the frontend display from the backend engine via Go interfaces.
-* **Tasks:**
-  1. Define `Renderer` interface in `pkg/ui`:
-     ```go
-     type Renderer interface {
-         Init() error
-         RenderTick(event model.PlaybackEvent) error
-         Close() error
-     }
-     ```
-  2. Implement event listener inside `pkg/ui` subscribing to `chan PlaybackEvent` from the engine.
-  3. Ensure UI rendering runs on the main thread while engine timing runs in a dedicated goroutine.
+## 🛠️ Especificação Detalhada
+
+### 1. `pkg/ui/gui/font.go`
+- Carregar fonte TrueType incorporada via `embed.FS` ou do sistema.
+- Criar rotinas para medir o tamanho do texto (largura/altura em pixels) para renderização centralizada e alinhada dos acordes sobre as palavras.
+
+### 2. `pkg/ui/gui/ebiten.go`
+- Implementar as interfaces `ebiten.Game` e `ui.Renderer`:
+  ```go
+  type GUIRenderer struct {
+      // Estado de renderização
+      currentSong *song.Song
+      activeEvent engine.PlaybackEvent
+      // ...
+  }
+
+  func (g *GUIRenderer) Update() error {
+      // Processar inputs (ex: F11 para Fullscreen, Esc para sair)
+      return nil
+  }
+
+  func (g *GUIRenderer) Draw(screen *ebiten.Image) {
+      // Desenhar fundo, cabeçalho da música, versos da letra e acordes
+  }
+
+  func (g *GUIRenderer) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
+      return 1280, 720 // Resolução base de referência
+  }
+  ```
+
+### 3. `pkg/ui/gui/view.go`
+- **Renderização dos Acordes:** Posicionar as cifras em uma linha dedicada imediatamente acima de cada palavra/sílaba correspondente.
+- **Destaque do Karaokê:**
+  - Cor normal de texto inativo (ex: cinza claro/branco).
+  - Cor do texto ativo (ex: amarelo/dourado brilhante).
+  - Animação simples de transição/preenchimento (sweep effect ou fade).
+- **Auto-scroll:** Ajustar a posição vertical do texto conforme a música avança, mantendo a linha ativa centralizada na tela.
 
 ---
 
-### Step 8: Terminal UI Prototype (TUI - Option A)
-* **Objective:** Implement a lightweight terminal interface for headless/CLI environments.
-* **Tasks:**
-  1. Create `pkg/ui/tui` using `bubbletea`.
-  2. Build components:
-     * **Header:** Song title, artist, BPM, key, elapsed time / total duration.
-     * **Lyric Display:** Active sentence with highlighted active word/syllable.
-     * **Chord Banner:** Current chord and upcoming chord preview.
-     * **Controls Bar:** Play/Pause status indicator, Volume level indicator.
-  3. Wire keyboard inputs (`Space` = Play/Pause, `Q` = Quit, `Left`/`Right` = Seek).
+## 🧪 Testes e Validação Manual
+
+- Testar inicialização de janela com resolução nativa e redimensionamento.
+- Validar se o renderizador respeita a interface `ui.Renderer` sem vazar lógica específica do Ebitengine fora de `pkg/ui/gui`.
+- Verificar estabilidade da taxa de quadros (60 FPS) e ausência de travamentos no loop principal (`ebiten.RunGame`).
 
 ---
 
-### Step 9: Graphical 2D Interface (Ebitengine - Option B)
-* **Objective:** Build a clean graphical interface suitable for monitors, TVs, and Raspberry Pi desktop environments.
-* **Tasks:**
-  1. Create `pkg/ui/gui` using `ebiten/v2`.
-  2. Load custom TrueType/OpenType fonts (`golang.org/x/image/font`).
-  3. Implement smooth text highlight transitions (karaoke-style color fill across lyrics based on millisecond progress).
-  4. Render visual chord boxes/diagrams alongside lyric timing.
-  5. Implement automatic window resizing and full-screen toggling (`F11`).
+## 🚀 Requisitos de Entrega (Checklist para o Agente)
 
----
-
-### Step 10: Song Selector & Playlist Navigation
-* **Objective:** Allow users to browse local files and select songs without restarting the application.
-* **Tasks:**
-  1. Implement song library scanner in `pkg/parser` to index `.json` / `.yaml` files in a `./songs` directory.
-  2. Build a file browser / song menu UI component.
-  3. Implement song loading and state resets between tracks.
-
----
-
-### Step 11: End-to-End System Integration & Benchmarking
-* **Objective:** Validate performance, memory usage, and sync accuracy across target devices.
-* **Tasks:**
-  1. Integrate backend engine, synthesizer, and graphical UI into unified binary (`cmd/pioke/main.go`).
-  2. Run latency and timing benchmarks on Raspberry Pi 3/4/5 and low-end hardware.
-  3. Profile memory allocations and CPU utilization during continuous audio playback.
+- [ ] Código implementado sob `pkg/ui/gui`.
+- [ ] Fontes renderizadas sem artefatos e com suporte a caracteres da língua portuguesa.
+- [ ] Suporte a alternância de tela cheia (Fullscreen) via atalho (ex: `F11` ou `Alt+Enter`).
+- [ ] Interface desacoplada usando a abstração `ui.Renderer`.
