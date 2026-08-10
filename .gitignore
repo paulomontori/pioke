@@ -1,1 +1,5 @@
-.aider*
+# Binários e builds
+*.exe
+*.exe;
+*.dll
+*.so
