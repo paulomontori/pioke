@@ -15,7 +15,7 @@ const (
 	WaveSawtooth
 )
 
-// ADSR Envelope
+// Envelope do ADSR
 type Envelope struct {
 	Attack  time.Duration
 	Decay   time.Duration
@@ -115,4 +115,20 @@ func GenerateWaveSample(waveType WaveType, freq float64, t float64) float64 {
 	default:
 		return math.Sin(2 * math.Pi * freq * t)
 	}
+}
+
+// GeneratePolyphonicSample calcula a amostra instantânea somando múltiplas frequências ativas e normalizando pelo número de vozes
+func GeneratePolyphonicSample(freqs []float64, t float64) float64 {
+	if len(freqs) == 0 {
+		return 0.0
+	}
+
+	var sum float64
+	for _, freq := range freqs {
+		if freq > 0 {
+			sum += math.Sin(2 * math.Pi * freq * t)
+		}
+	}
+
+	return sum / float64(len(freqs))
 }
