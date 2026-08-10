@@ -59,14 +59,19 @@ func validateAndProcessSong(s *model.Song) error {
 
 	for i := range s.Timeline {
 		event := &s.Timeline[i]
-		if event.TimeMS > 0 {
-			event.Duration = time.Duration(event.TimeMS) * time.Millisecond
-		} else if event.Timestamp != "" {
+		
+		// Preenche TimeMS a partir do Timestamp se necessário
+		if event.TimeMS == 0 && event.Timestamp != "" {
 			d, err := parseTimestamp(event.Timestamp)
 			if err != nil {
 				return fmt.Errorf("timestamp inválido na linha do tempo [%s]: %w", event.Timestamp, err)
 			}
-			event.Duration = d
+			event.TimeMS = d.Milliseconds()
+		}
+
+		// Preenche Duration (time.Duration) a partir do DurationMS
+		if event.DurationMS > 0 {
+			event.Duration = time.Duration(event.DurationMS) * time.Millisecond
 		}
 	}
 

@@ -145,12 +145,8 @@ func (e *Engine) run() {
 			if e.song != nil {
 				for i := lastEmittedIndex + 1; i < len(e.song.Timeline); i++ {
 					event := &e.song.Timeline[i]
-					eventTime := event.TimeMS
-					if eventTime == 0 && event.Duration > 0 {
-						eventTime = event.Duration.Milliseconds()
-					}
-
-					if eventTime <= currentPos {
+					
+					if event.TimeMS <= currentPos {
 						e.eventsChan <- model.PlaybackEvent{
 							CurrentTimeMS: currentPos,
 							ActiveEvent:   event,
