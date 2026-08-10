@@ -69,7 +69,7 @@ pkg/
 
 ## 🚀 Requisitos de Entrega (Checklist para o Agente)
 
-- [ ] Pacote `pkg/song/library` e `pkg/song/loader` implementados.
-- [ ] Suporte nativo a parsing de arquivos `.json` e `.yaml`.
-- [ ] Testes unitários cobrindo varredura de arquivos e tratamento de erros para arquivos corrompidos.
-- [ ] Integração com as interfaces de UI (TUI/GUI) para exibição do menu de seleção.
+- [x] Pacote `pkg/song/library` e `pkg/song/loader` implementados.
+- [x] Suporte nativo a parsing de arquivos `.json` e `.yaml`.
+- [x] Testes unitários cobrindo varredura de arquivos e tratamento de erros para arquivos corrompidos.
+- [x] Integração com as interfaces de UI (TUI/GUI) para exibição do menu de seleção.
