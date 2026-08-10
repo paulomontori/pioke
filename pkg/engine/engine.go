@@ -5,26 +5,23 @@ import (
 	"time"
 
 	"pioke/pkg/model"
-	"pioke/pkg/ui"
 )
 
-// PlaybackState representa o estado atual da reprodução
-type PlaybackState int
-
+// Re-exporta ou mapeia os estados definidos em model para conveniência
 const (
-	StateStopped PlaybackState = iota
-	StatePlaying
-	StatePaused
+	STOPPED = model.STOPPED
+	PLAYING = model.PLAYING
+	PAUSED  = model.PAUSED
 )
 
 // Engine gerencia o ciclo de vida e tempo real de reprodução da música
 type Engine struct {
 	song       *model.Song
-	state      PlaybackState
-	position   time.Duration
+	state      model.PlaybackState
+	positionMS int64
 	ticker     *time.Ticker
 	stopChan   chan struct{}
-	eventsChan chan ui.PlaybackEvent
+	eventsChan chan model.PlaybackEvent
 	mu         sync.Mutex
 }
 
@@ -32,40 +29,40 @@ type Engine struct {
 func NewEngine(s *model.Song) *Engine {
 	return &Engine{
 		song:       s,
-		state:      StateStopped,
-		position:   0,
+		state:      model.STOPPED,
+		positionMS: 0,
 		stopChan:   make(chan struct{}),
-		eventsChan: make(chan ui.PlaybackEvent, 100),
+		eventsChan: make(chan model.PlaybackEvent, 100),
 	}
 }
 
 // Events retorna o canal de leitura para eventos de reprodução
-func (e *Engine) Events() <-chan ui.PlaybackEvent {
+func (e *Engine) Events() <-chan model.PlaybackEvent {
 	return e.eventsChan
 }
 
 // State retorna o estado atual do motor de reprodução
-func (e *Engine) State() PlaybackState {
+func (e *Engine) State() model.PlaybackState {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.state
 }
 
-// Position retorna a posição atual do tempo de reprodução
-func (e *Engine) Position() time.Duration {
+// Position retorna a posição atual do tempo de reprodução em ms
+func (e *Engine) Position() int64 {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.position
+	return e.positionMS
 }
 
-// Start inicia ou retoma a reprodução usando time.Ticker
-func (e *Engine) Start() {
+// Play inicia ou retoma a reprodução usando time.Ticker
+func (e *Engine) Play() {
 	e.mu.Lock()
-	if e.state == StatePlaying {
+	if e.state == model.PLAYING {
 		e.mu.Unlock()
 		return
 	}
-	e.state = StatePlaying
+	e.state = model.PLAYING
 	e.stopChan = make(chan struct{})
 	e.mu.Unlock()
 
@@ -76,34 +73,34 @@ func (e *Engine) Start() {
 func (e *Engine) Pause() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.state != StatePlaying {
+	if e.state != model.PLAYING {
 		return
 	}
-	e.state = StatePaused
+	e.state = model.PAUSED
 	close(e.stopChan)
 }
 
 // Stop para a reprodução e reinicia a posição
 func (e *Engine) Stop() {
 	e.mu.Lock()
-	if e.state == StateStopped {
+	if e.state == model.STOPPED {
 		e.mu.Unlock()
 		return
 	}
-	isPlaying := (e.state == StatePlaying)
-	e.state = StateStopped
-	e.position = 0
+	isPlaying := (e.state == model.PLAYING)
+	e.state = model.STOPPED
+	e.positionMS = 0
 	if isPlaying {
 		close(e.stopChan)
 	}
 	e.mu.Unlock()
 }
 
-// Seek altera a posição atual da reprodução
-func (e *Engine) Seek(d time.Duration) {
+// Seek altera a posição atual da reprodução em milissegundos
+func (e *Engine) Seek(ms int64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.position = d
+	e.positionMS = ms
 }
 
 // run é executado em uma goroutine e emite eventos conforme a linha do tempo avança
@@ -120,20 +117,33 @@ func (e *Engine) run() {
 			return
 		case <-e.ticker.C:
 			e.mu.Lock()
-			e.position += interval
-			currentPos := e.position
+			e.positionMS += 10
+			currentPos := e.positionMS
+			currentState := e.state
 			e.mu.Unlock()
 
+			var activeEvent *model.TimelineEvent
+
 			// Verifica se há eventos a emitir no tempo atual
-			for i, event := range e.song.Timeline {
-				if i > lastEmittedIndex && event.Duration <= currentPos {
-					e.eventsChan <- ui.PlaybackEvent{
-						Song:     e.song,
-						Current:  &e.song.Timeline[i],
-						Position: currentPos.Milliseconds(),
+			if e.song != nil {
+				for i := range e.song.Timeline {
+					event := &e.song.Timeline[i]
+					eventTime := event.TimeMS
+					if eventTime == 0 && event.Duration > 0 {
+						eventTime = event.Duration.Milliseconds()
 					}
-					lastEmittedIndex = i
+
+					if i > lastEmittedIndex && eventTime <= currentPos {
+						activeEvent = event
+						lastEmittedIndex = i
+					}
 				}
+			}
+
+			e.eventsChan <- model.PlaybackEvent{
+				CurrentTimeMS: currentPos,
+				ActiveEvent:   activeEvent,
+				State:         currentState,
 			}
 		}
 	}
