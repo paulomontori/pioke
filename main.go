@@ -57,7 +57,7 @@ func main() {
 					audioSynth.PlayChord(chord)
 				}
 
-				// Se o parâmetro -out foi passado, acumula os dados PCM sintetizados
+				// Se o parâmetro -out foi informado, sintetiza e armazena as amostras PCM para o arquivo WAV
 				if outputFile != "" && chord != "" {
 					durMS := pbEvent.ActiveEvent.DurationMS
 					if durMS <= 0 {
@@ -93,7 +93,7 @@ func main() {
 
 	eng.Stop()
 
-	// Gera o arquivo de áudio WAV ao término
+	// Gera o arquivo de áudio WAV ao término se a opção -out for definida
 	if outputFile != "" {
 		pcmMu.Lock()
 		defer pcmMu.Unlock()
