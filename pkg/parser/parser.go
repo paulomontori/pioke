@@ -115,8 +115,8 @@ func validateAndProcessSong(s *model.Song) error {
 			event.DurationMS = defaultDurationMS
 		}
 
-		// 4. Preenche Duration (time.Duration) a partir do DurationMS
-		event.Duration = time.Duration(event.DurationMS) * time.Millisecond
+		// 4. Preenche Duration (time.Duration) a partir do TimeMS (usado como start time no sistema)
+		event.Duration = time.Duration(event.TimeMS) * time.Millisecond
 
 		// 5. Preenche o Timestamp em string caso esteja vazio (útil para UI)
 		if event.Timestamp == "" {
