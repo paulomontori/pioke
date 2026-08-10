@@ -53,7 +53,9 @@ func main() {
 				if chord == "" && pbEvent.ActiveEvent.Chord != nil {
 					chord = pbEvent.ActiveEvent.Chord.Name
 				}
-				audioSynth.PlayChord(chord)
+				if chord != "" {
+					audioSynth.PlayChord(chord)
+				}
 
 				// Se o parâmetro -out foi passado, acumula os dados PCM sintetizados
 				if outputFile != "" && chord != "" {
@@ -70,6 +72,8 @@ func main() {
 					}
 				}
 			}
+
+			// Envia atualização contínua para a interface visual
 			_ = termUI.RenderTick(ui.PlaybackEvent{
 				Song:     s,
 				Current:  pbEvent.ActiveEvent,
@@ -78,7 +82,7 @@ func main() {
 		}
 	}()
 
-	// Aguarda o término dos eventos ou a saída da TUI
+	// Aguarda o término dos eventos para fechar a TUI automaticamente
 	go func() {
 		<-doneChan
 		termUI.Close()

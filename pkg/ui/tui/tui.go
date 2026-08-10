@@ -12,8 +12,11 @@ import (
 
 // Model representa o estado do Bubble Tea para a interface do terminal
 type Model struct {
-	Song  *model.Song
-	Event model.PlaybackEvent
+	Song       *model.Song
+	Event      model.PlaybackEvent
+	LastLyric  string
+	LastChord  string
+	PositionMS int64
 }
 
 // NewModel inicializa o modelo padrão do Bubble Tea
@@ -32,6 +35,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case EventMsg:
 		m.Event = model.PlaybackEvent(msg)
+		if m.Event.ActiveEvent != nil {
+			if m.Event.ActiveEvent.Lyric != "" {
+				m.LastLyric = m.Event.ActiveEvent.Lyric
+			}
+			if m.Event.ActiveEvent.ChordStr != "" {
+				m.LastChord = m.Event.ActiveEvent.ChordStr
+			} else if m.Event.ActiveEvent.Chord != nil {
+				m.LastChord = m.Event.ActiveEvent.Chord.Name
+			}
+		}
+		if m.Event.CurrentTimeMS > 0 {
+			m.PositionMS = m.Event.CurrentTimeMS
+		}
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" || msg.String() == "q" {
 			return m, tea.Quit
@@ -45,13 +61,23 @@ func (m Model) View() string {
 		return "Aguardando seleção de música...\n"
 	}
 
-	res := fmt.Sprintf("=== %s - %s ===\n", m.Song.Title, m.Song.Artist)
-	if m.Event.ActiveEvent != nil && m.Event.ActiveEvent.Lyric != "" {
-		res += fmt.Sprintf("\nLetra: %s\n", m.Event.ActiveEvent.Lyric)
+	seconds := m.PositionMS / 1000
+	mins := seconds / 60
+	secs := seconds % 60
+
+	res := fmt.Sprintf("=== %s - %s [%02d:%02d] ===\n\n", m.Song.Title, m.Song.Artist, mins, secs)
+
+	if m.LastLyric != "" {
+		res += fmt.Sprintf("Letra: %s\n", m.LastLyric)
+	} else {
+		res += "Letra: ...\n"
 	}
-	if m.Event.ActiveEvent != nil && m.Event.ActiveEvent.ChordStr != "" {
-		res += fmt.Sprintf("Acorde: %s\n", m.Event.ActiveEvent.ChordStr)
+
+	if m.LastChord != "" {
+		res += fmt.Sprintf("Acorde: %s\n", m.LastChord)
 	}
+
+	res += "\n(Pressione 'q' para sair)\n"
 	return res
 }
 
@@ -108,7 +134,8 @@ func (t *TerminalUI) RenderTick(event ui.PlaybackEvent) error {
 		t.model.Song = event.Song
 	}
 	t.HandleEvent(model.PlaybackEvent{
-		ActiveEvent: event.Current,
+		CurrentTimeMS: event.Position,
+		ActiveEvent:   event.Current,
 	})
 	return nil
 }
