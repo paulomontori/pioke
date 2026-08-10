@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"opentune/pkg/model"
+	"pioke/pkg/model"
 )
 
 // TerminalUI gerencia a exibição do karaokê na linha de comando
@@ -28,7 +28,7 @@ func (ui *TerminalUI) Close() error {
 // DisplayHeader exibe o cabeçalho da música
 func (ui *TerminalUI) DisplayHeader(s *model.Song) {
 	fmt.Printf("========================================\n")
-	fmt.Printf("   OpenTune / MicroMelody Karaoke\n")
+	fmt.Printf("   PioKe Karaoke Engine\n")
 	fmt.Printf("   Música: %s - %s\n", s.Title, s.Artist)
 	if s.BPM > 0 {
 		fmt.Printf("   BPM: %d | Tom: %s\n", s.BPM, s.Key)

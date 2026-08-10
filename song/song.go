@@ -2,7 +2,7 @@ package song
 
 import "time"
 
-// Song representa a estrutura completa de uma música no OpenTune
+// Song representa a estrutura completa de uma música no PioKe
 type Song struct {
 	Metadata Metadata        `json:"metadata" yaml:"metadata"`
 	Title    string          `json:"title,omitempty" yaml:"title,omitempty"`

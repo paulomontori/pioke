@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"opentune/pkg/model"
+	"pioke/pkg/model"
 
 	"gopkg.in/yaml.v3"
 )

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"opentune/pkg/synth"
+	"pioke/pkg/synth"
 
 	"github.com/hajimehoshi/oto/v3"
 )

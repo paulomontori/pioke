@@ -1,6 +1,6 @@
-# OpenTune — Frontend Roadmap & UI Implementation Options
+# PioKe — Frontend Roadmap & UI Implementation Options
 
-> **Document Scope:** Interface layer options, cross-platform rendering considerations, step-by-step UI roadmap, and integration patterns for the OpenTune interactive karaoke engine.
+> **Document Scope:** Interface layer options, cross-platform rendering considerations, step-by-step UI roadmap, and integration patterns for the PioKe interactive karaoke engine.
 
 ---
 
@@ -86,6 +86,6 @@ To maintain low latency and low CPU/RAM usage on Raspberry Pi and modest hardwar
 ### Step 11: End-to-End System Integration & Benchmarking
 * **Objective:** Validate performance, memory usage, and sync accuracy across target devices.
 * **Tasks:**
-  1. Integrate backend engine, synthesizer, and graphical UI into unified binary (`cmd/opentune/main.go`).
+  1. Integrate backend engine, synthesizer, and graphical UI into unified binary (`cmd/pioke/main.go`).
   2. Run latency and timing benchmarks on Raspberry Pi 3/4/5 and low-end hardware.
   3. Profile memory allocations and CPU utilization during continuous audio playback.

@@ -1,8 +1,8 @@
-# OpenTune / MicroMelody 🎤🎶
+# PioKe 🎤🎶
 
 > **Interactive Real-Time Karaoke Engine & Chord Synthesizer built in Go.**
 
-OpenTune é uma engine de karaokê e sintetizador de acordes em tempo real, leve e multiplataforma, desenvolvida em Go. O projeto foi projetado para rodar com baixíssimo consumo de CPU e memória em computadores de baixo custo, Raspberry Pi, Smart TVs e sistemas embarcados.
+PioKe é uma engine de karaokê e sintetizador de acordes em tempo real, leve e multiplataforma, desenvolvida em Go. O projeto foi projetado para rodar com baixíssimo consumo de CPU e memória em computadores de baixo custo, Raspberry Pi, Smart TVs e sistemas embarcados.
 
 ---
 
@@ -49,7 +49,7 @@ OpenTune é uma engine de karaokê e sintetizador de acordes em tempo real, leve
 ```
 .
 ├── cmd/
-│   └── opentune-cli/      # Ponto de entrada oficial da aplicação CLI
+│   └── pioke-cli/         # Ponto de entrada oficial da aplicação CLI
 ├── examples/
 │   └── sample.json        # Arquivo de exemplo de música (Evidências)
 ├── pkg/
@@ -117,7 +117,7 @@ go run main.go caminho/para/sua_musica.json
 Você também pode compilar e rodar a CLI diretamente:
 
 ```bash
-go run cmd/opentune-cli/main.go
+go run cmd/pioke-cli/main.go
 ```
 
 ---

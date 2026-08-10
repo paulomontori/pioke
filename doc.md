@@ -1,4 +1,4 @@
-# OpenTune / MicroMelody — Interactive Real-Time Karaoke Engine
+# PioKe — Interactive Real-Time Karaoke Engine
 
 > **A lightweight, cross-platform, interactive karaoke & chord synth engine built in Go.** Designed to run efficiently on single-board computers (Raspberry Pi), low-spec PCs, Smart TVs, and mobile devices.
 

@@ -1,7 +1,7 @@
 package ui
 
 import (
-	"opentune/pkg/model"
+	"pioke/pkg/model"
 )
 
 // PlaybackEvent representa o estado transmitido para a UI a cada tique ou evento

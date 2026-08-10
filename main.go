@@ -6,10 +6,10 @@ import (
 	"os"
 	"time"
 
-	"opentune/pkg/audio"
-	"opentune/pkg/engine"
-	"opentune/pkg/parser"
-	"opentune/pkg/ui"
+	"pioke/pkg/audio"
+	"pioke/pkg/engine"
+	"pioke/pkg/parser"
+	"pioke/pkg/ui"
 )
 
 func main() {

@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"opentune/pkg/model"
-	"opentune/pkg/ui"
+	"pioke/pkg/model"
+	"pioke/pkg/ui"
 )
 
 // PlaybackState representa o estado atual da reprodução

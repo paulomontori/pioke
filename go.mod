@@ -1,4 +1,4 @@
-module opentune
+module pioke
 
 go 1.21
 
