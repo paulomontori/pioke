@@ -24,8 +24,13 @@ func main() {
 		log.Fatalf("Erro ao carregar a música: %v\n", err)
 	}
 
-	termUI := ui.NewTerminalUI()
-	termUI.DisplayHeader(s)
+	var renderer ui.Renderer = ui.NewTerminalUI()
+	if err := renderer.Init(); err != nil {
+		log.Fatalf("Erro ao inicializar UI: %v\n", err)
+	}
+	defer renderer.Close()
+
+	renderer.DisplayHeader(s)
 
 	synth := audio.NewSynth()
 	eng := engine.NewEngine(s)
@@ -33,17 +38,19 @@ func main() {
 
 	done := make(chan bool)
 	go func() {
-		for event := range eng.Events() {
-			chord := event.ChordStr
-			if chord == "" && event.Chord != nil {
-				chord = event.Chord.Name
+		for pbEvent := range eng.Events() {
+			if pbEvent.Current != nil {
+				chord := pbEvent.Current.ChordStr
+				if chord == "" && pbEvent.Current.Chord != nil {
+					chord = pbEvent.Current.Chord.Name
+				}
+
+				// Toca o acorde via sintetizador de áudio
+				synth.PlayChord(chord)
 			}
 
-			// Toca o acorde via sintetizador de áudio
-			synth.PlayChord(chord)
-
-			// Exibe na UI
-			termUI.RenderEvent(event)
+			// Renderiza na UI desacoplada
+			_ = renderer.RenderTick(pbEvent)
 		}
 		done <- true
 	}()

@@ -15,6 +15,16 @@ func NewTerminalUI() *TerminalUI {
 	return &TerminalUI{}
 }
 
+// Init inicializa a UI do terminal
+func (ui *TerminalUI) Init() error {
+	return nil
+}
+
+// Close finaliza a UI do terminal
+func (ui *TerminalUI) Close() error {
+	return nil
+}
+
 // DisplayHeader exibe o cabeçalho da música
 func (ui *TerminalUI) DisplayHeader(s *model.Song) {
 	fmt.Printf("========================================\n")
@@ -26,19 +36,31 @@ func (ui *TerminalUI) DisplayHeader(s *model.Song) {
 	fmt.Printf("========================================\n\n")
 }
 
-// RenderEvent exibe a letra e o acorde sincronizados em tempo real
-func (ui *TerminalUI) RenderEvent(event model.TimelineEvent) {
-	currentTime := event.Duration / time.Millisecond
-
-	chord := event.ChordStr
-	if chord == "" && event.Chord != nil {
-		chord = event.Chord.Name
+// RenderTick implementa a interface Renderer para a UI de terminal
+func (ui *TerminalUI) RenderTick(e PlaybackEvent) error {
+	if e.Current == nil {
+		return nil
 	}
 
-	lyric := event.Lyric
-	if lyric == "" && event.Lyrics != nil {
-		lyric = event.Lyrics.Text
+	currentTime := e.Current.Duration / time.Millisecond
+
+	chord := e.Current.ChordStr
+	if chord == "" && e.Current.Chord != nil {
+		chord = e.Current.Chord.Name
+	}
+
+	lyric := e.Current.Lyric
+	if lyric == "" && e.Current.Lyrics != nil {
+		lyric = e.Current.Lyrics.Text
 	}
 
 	fmt.Printf("[%05d ms] Acorde: %-6s | Letra: %s\n", currentTime, chord, lyric)
+	return nil
+}
+
+// RenderEvent exibe a letra e o acorde sincronizados em tempo real (compatibilidade)
+func (ui *TerminalUI) RenderEvent(event model.TimelineEvent) {
+	ui.RenderTick(PlaybackEvent{
+		Current: &event,
+	})
 }

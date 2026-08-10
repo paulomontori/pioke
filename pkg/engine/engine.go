@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"opentune/pkg/model"
+	"opentune/pkg/ui"
 )
 
 // PlaybackState representa o estado atual da reprodução
@@ -23,7 +24,7 @@ type Engine struct {
 	position   time.Duration
 	ticker     *time.Ticker
 	stopChan   chan struct{}
-	eventsChan chan model.TimelineEvent
+	eventsChan chan ui.PlaybackEvent
 	mu         sync.Mutex
 }
 
@@ -34,12 +35,12 @@ func NewEngine(s *model.Song) *Engine {
 		state:      StateStopped,
 		position:   0,
 		stopChan:   make(chan struct{}),
-		eventsChan: make(chan model.TimelineEvent, 100),
+		eventsChan: make(chan ui.PlaybackEvent, 100),
 	}
 }
 
-// Events retorna o canal de leitura para eventos da linha do tempo
-func (e *Engine) Events() <-chan model.TimelineEvent {
+// Events retorna o canal de leitura para eventos de reprodução
+func (e *Engine) Events() <-chan ui.PlaybackEvent {
 	return e.eventsChan
 }
 
@@ -126,7 +127,11 @@ func (e *Engine) run() {
 			// Verifica se há eventos a emitir no tempo atual
 			for i, event := range e.song.Timeline {
 				if i > lastEmittedIndex && event.Duration <= currentPos {
-					e.eventsChan <- event
+					e.eventsChan <- ui.PlaybackEvent{
+						Song:     e.song,
+						Current:  &e.song.Timeline[i],
+						Position: currentPos.Milliseconds(),
+					}
 					lastEmittedIndex = i
 				}
 			}
