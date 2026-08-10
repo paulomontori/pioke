@@ -1,18 +1,17 @@
-# Prompt de Implementação — Fase 6: Interface Gráfica 2D (`pkg/ui/gui` - Ebitengine)
+# Prompt de Implementação — Fase 7: Navegação e Seletor de Músicas (`pkg/song/library`)
 
 **Projeto:** Pioke (`github.com/paulomontori/pioke`)  
 **Linguagem:** Go (Golang)  
-**Objetivo da Task:** Implementar a interface gráfica 2D (GUI) usando a biblioteca Ebitengine (`github.com/hajimehoshi/ebiten/v2`), oferecendo uma visualização fluida e responsiva para telas desktop e Raspberry Pi OS (HDMI), com suporte a modo tela cheia, renderização de fontes customizadas e transição suave no destaque de letras e acordes.
+**Objetivo da Task:** Criar o gerenciador de biblioteca de músicas para escanear diretórios locais (ex: `./songs`), listar, filtrar e carregar dinamicamente arquivos de música em formato `.json` ou `.yaml`, permitindo a navegação e troca de faixas sem reiniciar a aplicação.
 
 ---
 
 ## 📐 Visão Geral & Objetivos
 
-A Fase 6 cria a experiência visual rica do Pioke. O `pkg/ui/gui` deve implementar a interface `Renderer` definida na Fase 5 e gerenciar a janela do Ebitengine:
-1. Renderizar as linhas de texto (com suporte a UTF-8/Acentuação) e posições de acordes.
-2. Animar/destacar a palavra ou sílaba atual de forma fluida (interpolação visual/smooth transition).
-3. Suportar alternância para Fullscreen, ajuste automático de resolução e escala para telas de TV/monitores via Raspberry Pi.
-4. Manter baixíssimo consumo de CPU/GPU para garantir 60 FPS estáveis no Raspberry Pi 3/4/5.
+A Fase 7 adiciona a funcionalidade de menu/seletor de faixas ao Pioke. O módulo `pkg/song/library` deve:
+1. Ler o diretório configurado (`./songs`) e fazer o parse dos metadados de todas as músicas encontradas sem carregar o áudio/eventos completos na memória de uma só vez (lazy loading ou leitura rápida de cabeçalho).
+2. Fornecer uma estrutura para listar músicas com filtros simples (título, artista, tom/key, bpm).
+3. Permitir a alternância dinâmica de faixas: interromper o playback atual, resetar o motor de áudio/síntese e carregar a nova música selecionada.
 
 ---
 
@@ -20,67 +19,57 @@ A Fase 6 cria a experiência visual rica do Pioke. O `pkg/ui/gui` deve implement
 
 ```text
 pkg/
-└── ui/
-    └── gui/
-        ├── ebiten.go         # Implementação de ebiten.Game e do Renderer
-        ├── font.go           # Carregamento e cache de fontes TrueType/OpenType (golang.org/x/image/font)
-        ├── view.go           # Lógica de layout (cálculo de bounding box, centralização, rolagem)
-        └── gui_test.go       # Testes de inicialização e mapeamento de estado
+└── song/
+    ├── library.go        # Gerenciador de diretório, varredura e lista de faixas
+    ├── loader.go         # Parsers para arquivos .json e .yaml
+    └── library_test.go    # Testes unitários para varredura e ordenação de biblioteca
 ```
 
 ---
 
 ## 🛠️ Especificação Detalhada
 
-### 1. `pkg/ui/gui/font.go`
-- Carregar fonte TrueType incorporada via `embed.FS` ou do sistema.
-- Criar rotinas para medir o tamanho do texto (largura/altura em pixels) para renderização centralizada e alinhada dos acordes sobre as palavras.
-
-### 2. `pkg/ui/gui/ebiten.go`
-- Implementar as interfaces `ebiten.Game` e `ui.Renderer`:
+### 1. `pkg/song/library.go`
+- **Estruturas de Dados:**
   ```go
-  type GUIRenderer struct {
-      // Estado de renderização
-      currentSong *song.Song
-      activeEvent engine.PlaybackEvent
-      // ...
+  type SongMetadata struct {
+      FilePath string `json:"file_path" yaml:"file_path"`
+      Title    string `json:"title" yaml:"title"`
+      Artist   string `json:"artist" yaml:"artist"`
+      BPM      int    `json:"bpm" yaml:"bpm"`
+      Key      string `json:"key" yaml:"key"`
   }
 
-  func (g *GUIRenderer) Update() error {
-      // Processar inputs (ex: F11 para Fullscreen, Esc para sair)
-      return nil
-  }
-
-  func (g *GUIRenderer) Draw(screen *ebiten.Image) {
-      // Desenhar fundo, cabeçalho da música, versos da letra e acordes
-  }
-
-  func (g *GUIRenderer) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
-      return 1280, 720 // Resolução base de referência
+  type Library struct {
+      songsDir string
+      items    []SongMetadata
   }
   ```
+- **Métodos Principais:**
+  - `NewLibrary(dir string) *Library`: Instancia a biblioteca vinculada ao diretório especificado.
+  - `Scan() ([]SongMetadata, error)`: Varre o diretório `./songs` utilizando `os.ReadDir` ou `filepath.WalkDir`, identificando arquivos `.json` e `.yaml` / `.yml`.
+  - `GetSong(filePath string) (*song.Song, error)`: Carrega o objeto `Song` completo a ser entregue ao `engine`.
 
-### 3. `pkg/ui/gui/view.go`
-- **Renderização dos Acordes:** Posicionar as cifras em uma linha dedicada imediatamente acima de cada palavra/sílaba correspondente.
-- **Destaque do Karaokê:**
-  - Cor normal de texto inativo (ex: cinza claro/branco).
-  - Cor do texto ativo (ex: amarelo/dourado brilhante).
-  - Animação simples de transição/preenchimento (sweep effect ou fade).
-- **Auto-scroll:** Ajustar a posição vertical do texto conforme a música avança, mantendo a linha ativa centralizada na tela.
+### 2. `pkg/song/loader.go`
+- Suporte a múltiplos formatos de arquivo:
+  - JSON (`encoding/json`)
+  - YAML (`gopkg.in/yaml.v3`)
+- Validação rápida de esquema/estrutura ao escanear para ignorar arquivos inválidos ou que não sejam faixas do Pioke.
 
 ---
 
-## 🧪 Testes e Validação Manual
+## 🧪 Testes e Validação
 
-- Testar inicialização de janela com resolução nativa e redimensionamento.
-- Validar se o renderizador respeita a interface `ui.Renderer` sem vazar lógica específica do Ebitengine fora de `pkg/ui/gui`.
-- Verificar estabilidade da taxa de quadros (60 FPS) e ausência de travamentos no loop principal (`ebiten.RunGame`).
+1. **`pkg/song/library_test.go`**:
+   - Criar diretórios temporários (`t.TempDir()`) com arquivos `.json` e `.yaml` válidos e inválidos.
+   - Validar se o método `Scan()` encontra todas as faixas e ignora extensões/formatos desconhecidos.
+   - Garantir ordenação alfabética por Título ou Artista na listagem.
 
 ---
 
 ## 🚀 Requisitos de Entrega (Checklist para o Agente)
 
-- [ ] Código implementado sob `pkg/ui/gui`.
-- [ ] Fontes renderizadas sem artefatos e com suporte a caracteres da língua portuguesa.
-- [ ] Suporte a alternância de tela cheia (Fullscreen) via atalho (ex: `F11` ou `Alt+Enter`).
-- [ ] Interface desacoplada usando a abstração `ui.Renderer`.
+- [ ] Pacote `pkg/song/library` e `pkg/song/loader` implementados.
+- [ ] Suporte nativo a parsing de arquivos `.json` e `.yaml`.
+- [ ] Testes unitários cobrindo varredura de arquivos e tratamento de erros para arquivos corrompidos.
+- [ ] Integração com as interfaces de UI (TUI/GUI) para exibição do menu de seleção.
