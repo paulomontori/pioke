@@ -35,7 +35,6 @@ func main() {
 	if err := termUI.Init(); err != nil {
 		log.Fatalf("Erro ao inicializar TUI: %v\n", err)
 	}
-	defer termUI.Close()
 
 	audioSynth := audio.NewSynth()
 	eng := engine.NewEngine(s)
@@ -44,7 +43,10 @@ func main() {
 	var pcmBuffer []byte
 	var pcmMu sync.Mutex
 
+	doneChan := make(chan struct{})
+
 	go func() {
+		defer close(doneChan)
 		for pbEvent := range eng.Events() {
 			if pbEvent.ActiveEvent != nil {
 				chord := pbEvent.ActiveEvent.ChordStr
@@ -76,14 +78,18 @@ func main() {
 		}
 	}()
 
-	// Inicia a TUI interativa (mantém a aplicação rodando até pressionar 'q' ou 'Ctrl+C')
-	if err := termUI.Run(); err != nil {
-		log.Printf("Erro na execução da TUI: %v\n", err)
-	}
+	// Aguarda o término dos eventos ou a saída da TUI
+	go func() {
+		<-doneChan
+		termUI.Close()
+	}()
+
+	// Inicia a TUI interativa (bloqueante)
+	_ = termUI.Run()
 
 	eng.Stop()
 
-	// Gera o arquivo de áudio WAV se o parâmetro -out foi informado
+	// Gera o arquivo de áudio WAV ao término
 	if outputFile != "" {
 		pcmMu.Lock()
 		defer pcmMu.Unlock()
@@ -92,10 +98,10 @@ func main() {
 			if err != nil {
 				fmt.Printf("Erro ao salvar arquivo de áudio: %v\n", err)
 			} else {
-				fmt.Printf("Áudio gravado com sucesso em: %s\n", outputFile)
+				fmt.Printf("\nÁudio gravado com sucesso em: %s\n", outputFile)
 			}
 		} else {
-			fmt.Println("Nenhum áudio gerado para gravar.")
+			fmt.Println("\nNenhum áudio gerado para gravar.")
 		}
 	}
 }

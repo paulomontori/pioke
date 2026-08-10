@@ -113,8 +113,20 @@ func (e *Engine) run() {
 	interval := 10 * time.Millisecond // Resolução de ticker de 10ms
 	e.ticker = time.NewTicker(interval)
 	defer e.ticker.Stop()
+	defer close(e.eventsChan)
 
 	lastEmittedIndex := -1
+
+	// Calcula a duração total da música
+	var totalDurationMS int64
+	if e.song != nil && len(e.song.Timeline) > 0 {
+		lastEvent := e.song.Timeline[len(e.song.Timeline)-1]
+		dur := lastEvent.DurationMS
+		if dur <= 0 {
+			dur = 2000
+		}
+		totalDurationMS = lastEvent.TimeMS + dur
+	}
 
 	for {
 		select {
@@ -149,6 +161,14 @@ func (e *Engine) run() {
 				CurrentTimeMS: currentPos,
 				ActiveEvent:   activeEvent,
 				State:         currentState,
+			}
+
+			// Se ultrapassou o fim da música, encerra a reprodução
+			if totalDurationMS > 0 && currentPos >= totalDurationMS+500 {
+				e.mu.Lock()
+				e.state = model.STOPPED
+				e.mu.Unlock()
+				return
 			}
 		}
 	}
