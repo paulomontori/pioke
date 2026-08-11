@@ -1,24 +1,19 @@
-# Refatoração Crítica: Polifonia Real e Stream Não-Bloqueante (pkg/synth & pkg/audio)
+Update the PiOke song format to support advanced features: syllables, pitch, velocity, and articulation.
 
-**Problemas Identificados:**
-1. Os acordes não estão soando polifônicos (apenas uma nota estática ou timbre incorreto é ouvido).
-2. O áudio sofre engasgos constantes/tremolo devido a bloqueios na implementação do `io.Reader` do stream de áudio.
+Requirements:
+1. In pkg/model/song.go, update the `TimelineEvent` struct to include:
+   - `Velocity` (int): Volume intensity (0-127).
+   - `Articulation` (string): e.g., "legato", "staccato".
+   - `Syllables` ([]Syllable): A new list of syllable objects.
 
----
+2. Create a new `Syllable` struct in pkg/model/song.go with:
+   - `Text` (string): The syllable text (e.g., "Pa", "ra", "béns").
+   - `OffsetMS` (int64): Start time of the syllable relative to the parent TimelineEvent's time_ms.
+   - `DurationMS` (int64): How long the syllable lasts.
+   - `Pitch` (string): Musical note for the melody (e.g., "G4", "C5").
 
-## 🛠️ Especificação da Correção
+3. In pkg/parser/json.go, ensure the JSON/YAML unmarshaling correctly maps these new fields. Add fallback logic so that if a song does not have `Syllables`, it still parses successfully using the basic `lyric` string.
 
-### 1. `pkg/synth/chord.go` — Definição Precisa dos Acordes
-- [x] Cada acorde retorna um slice com as frequências reais em Hz de **todas** as suas notas:
-  - `C` (Dó Maior): `[261.63, 329.63, 392.00]` (C4, E4, G4)
-  - `G7` (Sol com Sétima): `[196.00, 246.94, 293.66, 349.23]` (G3, B3, D4, F4)
-  - `F` (Fá Maior): `[174.61, 220.00, 261.63]` (F3, A3, C4)
-  - `C7` (Dó com Sétima): `[261.63, 329.63, 392.00, 466.16]` (C4, E4, G4, Bb4)
+4. In songs/evidencias.json, add an advanced timeline event example that includes the `velocity`, `articulation`, and a `syllables` array to validate the new structure.
 
-### 2. `pkg/synth/wave.go` — Síntese Polifônica com Soma de Senóides
-- [x] Ao gerar amostras para um acorde, calcula o valor instantâneo de cada frequência ativa e soma as ondas dividindo pela quantidade de vozes para evitar saturação.
-
-### 3. `pkg/audio/engine.go` — Stream Contínuo Não-Bloqueante
-- [x] O driver de áudio (oto ou beep) lê de uma struct que implementa `io.Reader` sem nunca travar ou bloquear.
-- [x] Se não houver notas ativas, preenche o buffer com silêncio e retorna `len(buf), nil`.
-- [x] Nunca utiliza `time.Sleep` ou canais bloqueantes dentro do método `Read`.
+5. Run `go test ./pkg/parser/...` and ensure the tests pass with the updated models.

@@ -1,142 +1,122 @@
 package synth
 
 import (
+	"math"
 	"sync"
-	"time"
 )
 
-// Synthesizer define a interface para geração polifônica de áudio sintetizado
-type Synthesizer interface {
-	PlayChord(name string, duration time.Duration)
-	PlayNote(freq float64, duration time.Duration)
-	ReadPCM(samples []float32) int
-	Stop()
+// Mapeamento das frequências dos acordes em Hz
+var chordFrequencies = map[string][]float64{
+	"C":  {261.63, 329.63, 392.00},         // C4, E4, G4
+	"G":  {196.00, 246.94, 293.66},         // G3, B3, D4
+	"G7": {196.00, 246.94, 293.66, 349.23}, // G3, B3, D4, F4
+	"F":  {174.61, 220.00, 261.63},         // F3, A3, C4
+	"C7": {261.63, 329.63, 392.00, 466.16}, // C4, E4, G4, Bb4
+	"Am": {220.00, 261.63, 329.63},         // A3, C4, E4
+	"Dm": {146.83, 174.61, 220.00},         // D3, F3, A3
+	"Em": {164.81, 196.00, 246.94},         // E3, G3, B3
 }
 
-type ActiveVoice struct {
-	Frequencies []float64
-	StartTime   time.Time
-	Duration    time.Duration
-	Envelope    Envelope
-	WaveType    WaveType
-}
-
-// PolySynth gerencia vozes ativas e gera buffer PCM polifônico sem clipping
-type PolySynth struct {
+type Synthesizer struct {
 	mu         sync.Mutex
-	voices     []ActiveVoice
 	sampleRate int
-	sampleTime float64
-	waveType   WaveType
-	envelope   Envelope
+	phases     []float64
+	activeFreq []float64
+	volume     float64
 }
 
-// NewPolySynth cria uma nova instância do sintetizador polifônico
-func NewPolySynth(sampleRate int) *PolySynth {
-	return &PolySynth{
+func NewSynthesizer(sampleRate int) *Synthesizer {
+	return &Synthesizer{
 		sampleRate: sampleRate,
-		waveType:   WaveSine,
-		envelope:   DefaultEnvelope(),
-		voices:     make([]ActiveVoice, 0),
+		volume:     0.3,
 	}
 }
 
-func (s *PolySynth) PlayChord(name string, duration time.Duration) {
-	freqs := GetChordFrequencies(name)
-	if len(freqs) == 0 {
+// SetChord altera o acorde ativo mantendo a fase contínua
+func (s *Synthesizer) SetChord(chordName string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	freqs, exists := chordFrequencies[chordName]
+	if !exists {
+		s.activeFreq = nil
+		s.phases = nil
 		return
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.voices = append(s.voices, ActiveVoice{
-		Frequencies: freqs,
-		StartTime:   time.Now(),
-		Duration:    duration,
-		Envelope:    s.envelope,
-		WaveType:    s.waveType,
-	})
+	s.activeFreq = freqs
+	if len(s.phases) != len(freqs) {
+		s.phases = make([]float64, len(freqs))
+	}
 }
 
-func (s *PolySynth) PlayNote(freq float64, duration time.Duration) {
-	if freq <= 0 {
-		return
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.voices = append(s.voices, ActiveVoice{
-		Frequencies: []float64{freq},
-		StartTime:   time.Now(),
-		Duration:    duration,
-		Envelope:    s.envelope,
-		WaveType:    s.waveType,
-	})
+// Stop interrompe a emissão de som
+func (s *Synthesizer) Stop() {
+	s.SetChord("")
 }
 
-// ReadPCM preenche o buffer de amostragem em float32 (-1.0 a 1.0)
-func (s *PolySynth) ReadPCM(samples []float32) int {
+// ReadPCM preenche um buffer de amostras float32 (usado pelo engine/gravador WAV)
+func (s *Synthesizer) ReadPCM(samples []float32) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	dt := 1.0 / float64(s.sampleRate)
-	now := time.Now()
-
-	activeVoices := make([]ActiveVoice, 0, len(s.voices))
-
-	for _, v := range s.voices {
-		if now.Sub(v.StartTime) <= v.Duration+v.Envelope.Release {
-			activeVoices = append(activeVoices, v)
+	if len(s.activeFreq) == 0 {
+		for i := range samples {
+			samples[i] = 0
 		}
-	}
-	s.voices = activeVoices
-
-	for i := range samples {
-		var sampleAcc float64
-
-		for _, voice := range s.voices {
-			elapsed := now.Sub(voice.StartTime) + time.Duration(float64(i)*dt*float64(time.Second))
-			envAmp := voice.Envelope.AmplitudeEnvelope(elapsed, voice.Duration)
-
-			if envAmp <= 0 {
-				continue
-			}
-
-			var chordAcc float64
-			for _, freq := range voice.Frequencies {
-				t := s.sampleTime + float64(i)*dt
-				chordAcc += GenerateWaveSample(voice.WaveType, freq, t)
-			}
-			if len(voice.Frequencies) > 0 {
-				chordAcc /= float64(len(voice.Frequencies))
-			}
-
-			sampleAcc += chordAcc * envAmp
-		}
-
-		// Garante atenuação para evitar ruídos e clipping quando há múltiplas vozes
-		if len(s.voices) > 1 {
-			sampleAcc /= float64(len(s.voices))
-		}
-
-		// Clamp no intervalo [-1.0, 1.0]
-		if sampleAcc > 1.0 {
-			sampleAcc = 1.0
-		} else if sampleAcc < -1.0 {
-			sampleAcc = -1.0
-		}
-
-		samples[i] = float32(sampleAcc)
+		return len(samples)
 	}
 
-	s.sampleTime += float64(len(samples)) * dt
+	numVoices := float64(len(s.activeFreq))
+
+	for i := 0; i < len(samples); i++ {
+		var sample float64
+		for voiceIdx, freq := range s.activeFreq {
+			phaseStep := (2.0 * math.Pi * freq) / float64(s.sampleRate)
+			sample += math.Sin(s.phases[voiceIdx])
+			s.phases[voiceIdx] += phaseStep
+			if s.phases[voiceIdx] >= 2.0*math.Pi {
+				s.phases[voiceIdx] -= 2.0 * math.Pi
+			}
+		}
+		samples[i] = float32((sample / numVoices) * s.volume)
+	}
+
 	return len(samples)
 }
 
-func (s *PolySynth) Stop() {
+// Read implementa io.Reader preenchendo bytes PCM 16-bit (usado pelo Oto/Player)
+func (s *Synthesizer) Read(p []byte) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.voices = nil
+
+	numSamples := len(p) / 2
+	if len(s.activeFreq) == 0 {
+		for i := range p {
+			p[i] = 0
+		}
+		return len(p), nil
+	}
+
+	numVoices := float64(len(s.activeFreq))
+
+	for i := 0; i < numSamples; i++ {
+		var sample float64
+		for voiceIdx, freq := range s.activeFreq {
+			phaseStep := (2.0 * math.Pi * freq) / float64(s.sampleRate)
+			sample += math.Sin(s.phases[voiceIdx])
+			s.phases[voiceIdx] += phaseStep
+			if s.phases[voiceIdx] >= 2.0*math.Pi {
+				s.phases[voiceIdx] -= 2.0 * math.Pi
+			}
+		}
+
+		sample = (sample / numVoices) * s.volume
+		intSample := int16(sample * 32767.0)
+
+		p[i*2] = byte(intSample)
+		p[i*2+1] = byte(intSample >> 8)
+	}
+
+	return len(p), nil
 }
