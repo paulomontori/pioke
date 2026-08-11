@@ -38,9 +38,14 @@ func NewSynth() *Synth {
 	}
 }
 
-// PlayChord sintetiza o acorde com envelope ADSR e executa na placa de som
+// PlayChord sintetiza o acorde com envelope ADSR (duração padrão de 800ms) e executa na placa de som
 func (s *Synth) PlayChord(chord string) {
-	if !s.enabled || chord == "" {
+	s.PlayChordFor(chord, 800*time.Millisecond)
+}
+
+// PlayChordFor sintetiza o acorde com envelope ADSR pela duração informada e executa na placa de som
+func (s *Synth) PlayChordFor(chord string, duration time.Duration) {
+	if !s.enabled || chord == "" || duration <= 0 {
 		return
 	}
 
@@ -49,7 +54,26 @@ func (s *Synth) PlayChord(chord string) {
 		return
 	}
 
-	pcmData := synth.GeneratePCMWithADSR(frequencies, time.Millisecond*800)
+	s.play(frequencies, duration)
+}
+
+// PlayNote sintetiza uma única nota de melodia (ex: "G4", "C#5") pela duração informada — usado para
+// reproduzir as notas de syllables[].pitch em sequência
+func (s *Synth) PlayNote(noteName string, duration time.Duration) {
+	if !s.enabled || noteName == "" || duration <= 0 {
+		return
+	}
+
+	freq, ok := synth.NoteNameToFrequency(noteName)
+	if !ok {
+		return
+	}
+
+	s.play([]float64{freq}, duration)
+}
+
+func (s *Synth) play(frequencies []float64, duration time.Duration) {
+	pcmData := synth.GeneratePCMWithADSR(frequencies, duration)
 	player := s.context.NewPlayer(bytes.NewReader(pcmData))
 	player.Play()
 }

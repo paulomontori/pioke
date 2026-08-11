@@ -115,7 +115,7 @@ func (e *Engine) run() {
 	defer e.ticker.Stop()
 	defer close(e.eventsChan)
 
-	lastEmittedIndex := -1
+	activeIndex := -1
 
 	// Calcula a duração total da música
 	var totalDurationMS int64
@@ -152,36 +152,37 @@ func (e *Engine) run() {
 			currentState := e.state
 			e.mu.Unlock()
 
-			var emittedAny bool
-
-			// Verifica se há eventos a emitir no tempo atual
+			// Avança o índice do evento ativo conforme a linha do tempo é alcançada
+			var activeEvent *model.TimelineEvent
 			if e.song != nil {
-				for i := lastEmittedIndex + 1; i < len(e.song.Timeline); i++ {
-					event := &e.song.Timeline[i]
-					
-					if event.TimeMS <= currentPos {
-						e.eventsChan <- model.PlaybackEvent{
-							CurrentTimeMS: currentPos,
-							ActiveEvent:   event,
-							State:         currentState,
-						}
-						lastEmittedIndex = i
-						emittedAny = true
-					} else {
-						// Como a linha do tempo está em ordem cronológica,
-						// podemos parar de verificar os próximos eventos no futuro.
-						break
+				for activeIndex+1 < len(e.song.Timeline) && e.song.Timeline[activeIndex+1].TimeMS <= currentPos {
+					activeIndex++
+				}
+
+				// O evento permanece ativo durante toda a sua duração — não apenas no tick em que
+				// começou — para que consumidores (áudio, gravação WAV) não confundam "nenhum evento
+				// novo neste tick" com "nada tocando".
+				if activeIndex >= 0 {
+					event := &e.song.Timeline[activeIndex]
+					withinWindow := true
+					switch {
+					case event.DurationMS > 0:
+						withinWindow = currentPos < event.TimeMS+event.DurationMS
+					case activeIndex+1 < len(e.song.Timeline):
+						withinWindow = currentPos < e.song.Timeline[activeIndex+1].TimeMS
+					case totalDurationMS > 0:
+						withinWindow = currentPos < totalDurationMS
+					}
+					if withinWindow {
+						activeEvent = event
 					}
 				}
 			}
 
-			// Se nenhum evento específico foi emitido, envia um tick de tempo normal
-			if !emittedAny {
-				e.eventsChan <- model.PlaybackEvent{
-					CurrentTimeMS: currentPos,
-					ActiveEvent:   nil,
-					State:         currentState,
-				}
+			e.eventsChan <- model.PlaybackEvent{
+				CurrentTimeMS: currentPos,
+				ActiveEvent:   activeEvent,
+				State:         currentState,
 			}
 
 			// Se ultrapassou o fim da música, encerra a reprodução

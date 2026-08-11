@@ -2,12 +2,24 @@ package synth
 
 import (
 	"math"
+	"strconv"
 	"strings"
 )
 
 // NoteToFrequency converte nota MIDI (ex: 60 = C4, 69 = A4) em frequência Hz
 func NoteToFrequency(midiNote int) float64 {
 	return 440.0 * math.Pow(2.0, float64(midiNote-69)/12.0)
+}
+
+// baseNotes mapeia o nome da nota (sem oitava) para seu número MIDI na oitava 4 (C4 = 60)
+var baseNotes = map[string]int{
+	"C": 60, "C#": 61, "Db": 61,
+	"D": 62, "D#": 63, "Eb": 63,
+	"E": 64,
+	"F": 65, "F#": 66, "Gb": 66,
+	"G": 67, "G#": 68, "Ab": 68,
+	"A": 69, "A#": 70, "Bb": 70,
+	"B": 71,
 }
 
 // GetChordFrequencies recebe uma cifra (ex: "C", "Am", "G7", "Em") e retorna as frequências Hz das notas
@@ -31,17 +43,6 @@ func GetChordFrequencies(chord string) []float64 {
 	case "C7":
 		// C4 (261.63 Hz), E4 (329.63 Hz), G4 (392.00 Hz), Bb4 (466.16 Hz)
 		return []float64{261.63, 329.63, 392.00, 466.16}
-	}
-
-	// Mapeamento dinâmico genérico para notas base para MIDI offset (C4 = 60)
-	baseNotes := map[string]int{
-		"C": 60, "C#": 61, "Db": 61,
-		"D": 62, "D#": 63, "Eb": 63,
-		"E": 64,
-		"F": 65, "F#": 66, "Gb": 66,
-		"G": 67, "G#": 68, "Ab": 68,
-		"A": 69, "A#": 70, "Bb": 70,
-		"B": 71,
 	}
 
 	root := ""
@@ -95,4 +96,33 @@ func GetChordFrequencies(chord string) []float64 {
 	}
 
 	return freqs
+}
+
+// NoteNameToFrequency converte um nome de nota com oitava (ex: "G4", "C#5", "Bb3") em frequência Hz,
+// usando a notação científica onde C4 é o Dó central (nota MIDI 60).
+func NoteNameToFrequency(note string) (float64, bool) {
+	note = strings.TrimSpace(note)
+	if note == "" {
+		return 0, false
+	}
+
+	letterLen := 1
+	if len(note) >= 2 && (note[1] == '#' || note[1] == 'b') {
+		letterLen = 2
+	}
+	if letterLen >= len(note) {
+		return 0, false
+	}
+
+	baseMidi, exists := baseNotes[strings.Title(note[:letterLen])]
+	if !exists {
+		return 0, false
+	}
+
+	octave, err := strconv.Atoi(note[letterLen:])
+	if err != nil {
+		return 0, false
+	}
+
+	return NoteToFrequency(baseMidi + (octave-4)*12), true
 }

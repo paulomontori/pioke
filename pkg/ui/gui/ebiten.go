@@ -1,7 +1,6 @@
 package gui
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/hajimehoshi/ebiten/v2"
