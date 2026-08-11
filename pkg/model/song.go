@@ -24,14 +24,25 @@ type Metadata struct {
 
 // TimelineEvent representa um evento sincronizado na linha do tempo
 type TimelineEvent struct {
-	Timestamp  string        `json:"timestamp,omitempty" yaml:"timestamp,omitempty"` // ex: "01:23.45"
-	TimeMS     int64         `json:"time_ms,omitempty" yaml:"time_ms,omitempty"`     // tempo em ms
-	DurationMS int64         `json:"duration_ms,omitempty" yaml:"duration_ms,omitempty"`
-	Duration   time.Duration `json:"-" yaml:"-"`
-	Lyric      string        `json:"lyric,omitempty" yaml:"lyric,omitempty"`
-	ChordStr   string        `json:"chord,omitempty" yaml:"chord,omitempty"`
-	Lyrics     *LyricLine    `json:"lyrics,omitempty" yaml:"lyrics,omitempty"`
-	Chord      *ChordEvent   `json:"chord_obj,omitempty" yaml:"chord_obj,omitempty"`
+	Timestamp    string        `json:"timestamp,omitempty" yaml:"timestamp,omitempty"` // ex: "01:23.45"
+	TimeMS       int64         `json:"time_ms,omitempty" yaml:"time_ms,omitempty"`     // tempo em ms
+	DurationMS   int64         `json:"duration_ms,omitempty" yaml:"duration_ms,omitempty"`
+	Duration     time.Duration `json:"-" yaml:"-"`
+	Lyric        string        `json:"lyric,omitempty" yaml:"lyric,omitempty"`
+	ChordStr     string        `json:"chord,omitempty" yaml:"chord,omitempty"`
+	Lyrics       *LyricLine    `json:"lyrics,omitempty" yaml:"lyrics,omitempty"`
+	Chord        *ChordEvent   `json:"chord_obj,omitempty" yaml:"chord_obj,omitempty"`
+	Velocity     int           `json:"velocity,omitempty" yaml:"velocity,omitempty"`
+	Articulation string        `json:"articulation,omitempty" yaml:"articulation,omitempty"`
+	Syllables    []Syllable    `json:"syllables,omitempty" yaml:"syllables,omitempty"`
+}
+
+// Syllable representa uma sílaba cantada com propriedades avançadas
+type Syllable struct {
+	Text       string `json:"text" yaml:"text"`
+	OffsetMS   int64  `json:"offset_ms" yaml:"offset_ms"`
+	DurationMS int64  `json:"duration_ms" yaml:"duration_ms"`
+	Pitch      string `json:"pitch,omitempty" yaml:"pitch,omitempty"`
 }
 
 // LyricLine representa uma linha ou palavra da letra e seu tempo

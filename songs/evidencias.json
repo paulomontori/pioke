@@ -96,7 +96,17 @@
       "time_ms": 3564,
       "duration_ms": 297,
       "chord": "A/B",
-      "lyric": "[INTRO]"
+      "lyric": "Quan",
+      "velocity": 100,
+      "articulation": "legato",
+      "syllables": [
+        {
+          "text": "Quan",
+          "offset_ms": 0,
+          "duration_ms": 297,
+          "pitch": "E4"
+        }
+      ]
     }
   ]
 }

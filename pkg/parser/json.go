@@ -20,6 +20,19 @@ func LoadJSON(filePath string) (*model.Song, error) {
 		return nil, fmt.Errorf("erro ao decodificar json: %w", err)
 	}
 
+	// Lógica de fallback: se não houver sílabas, mas houver letra (lyric), cria uma sílaba padrão
+	for i := range song.Timeline {
+		if len(song.Timeline[i].Syllables) == 0 && song.Timeline[i].Lyric != "" {
+			song.Timeline[i].Syllables = []model.Syllable{
+				{
+					Text:       song.Timeline[i].Lyric,
+					OffsetMS:   0,
+					DurationMS: song.Timeline[i].DurationMS,
+				},
+			}
+		}
+	}
+
 	if err := validateAndProcessSong(&song); err != nil {
 		return nil, fmt.Errorf("falha na validação da música: %w", err)
 	}
