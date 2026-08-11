@@ -48,7 +48,7 @@ func (l *Library) Scan() ([]SongMetadata, error) {
 		}
 
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if ext != ".json" && ext != ".yaml" && ext != ".yml" {
+		if ext != ".json" && ext != ".yaml" && ext != ".yml" && ext != ".musicxml" && ext != ".xml" {
 			continue
 		}
 

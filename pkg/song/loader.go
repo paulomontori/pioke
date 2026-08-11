@@ -10,16 +10,26 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"pioke/pkg/model"
+	"pioke/pkg/parser"
 )
 
-// LoadMetadata lê apenas os metadados/cabeçalho de um arquivo .json ou .yaml/.yml
+// LoadMetadata lê apenas os metadados/cabeçalho de um arquivo .json, .yaml/.yml ou .musicxml/.xml
 func LoadMetadata(filePath string) (*SongMetadata, error) {
+	ext := strings.ToLower(filepath.Ext(filePath))
+
+	if ext == ".musicxml" || ext == ".xml" {
+		s, err := parser.ParseMusicXML(filePath)
+		if err != nil || s.Title == "" {
+			return nil, fmt.Errorf("formato de música ou metadados inválidos em: %s", filePath)
+		}
+		return &SongMetadata{FilePath: filePath, Title: s.Title, Artist: s.Artist, BPM: s.BPM, Key: s.Key}, nil
+	}
+
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao ler arquivo: %w", err)
 	}
 
-	ext := strings.ToLower(filepath.Ext(filePath))
 	var meta SongMetadata
 
 	switch ext {
@@ -54,14 +64,20 @@ func LoadMetadata(filePath string) (*SongMetadata, error) {
 	return nil, fmt.Errorf("formato de música ou metadados inválidos em: %s", filePath)
 }
 
-// LoadSong realiza a leitura e conversão do arquivo completo para model.Song (.json ou .yaml/.yml)
+// LoadSong realiza a leitura e conversão do arquivo completo para model.Song
+// (.json, .yaml/.yml ou .musicxml/.xml)
 func LoadSong(filePath string) (*model.Song, error) {
+	ext := strings.ToLower(filepath.Ext(filePath))
+
+	if ext == ".musicxml" || ext == ".xml" {
+		return parser.ParseMusicXML(filePath)
+	}
+
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao ler arquivo de música: %w", err)
 	}
 
-	ext := strings.ToLower(filepath.Ext(filePath))
 	var song model.Song
 
 	switch ext {
