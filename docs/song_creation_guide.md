@@ -14,7 +14,7 @@ O Pioke aceita arquivos com extensões `.json`, `.yaml` e `.yml`. Você pode org
 
 Um arquivo de música é composto por duas partes principais:
 1. **Cabeçalho/Metadados**: Informações sobre título, artista, tom e BPM.
-2. **Linha do Tempo (`timeline`)**: Lista de eventos sincronizados por tempo contendo letras e acordes.
+2. **Linha do Tempo (`timeline`)**: Lista de eventos sincronizados por tempo contendo letras, acordes e propriedades avançadas de canto.
 
 ---
 
@@ -26,7 +26,7 @@ Um arquivo de música é composto por duas partes principais:
 | `artist` | `string` | Não | Nome do artista/banda |
 | `bpm` | `int` | Não | Batidas por minuto |
 | `key` | `string` | Não | Tom principal da música (ex: `"C"`, `"Am"`, `"E"`) |
-| `time_signature` | `string` | Não | Fórmula de bússola (ex: `"4/4"`, `"3/4"`) |
+| `time_signature` | `string` | Não | Fórmula de compasso (ex: `"4/4"`, `"3/4"`) |
 
 ---
 
@@ -41,7 +41,20 @@ Cada item da lista `timeline` representa um evento num determinado momento da m�
 | `duration_ms` | `int64` | Duração do evento/acorde em milissegundos. |
 | `lyric` | `string` | Texto da letra simples para exibição rápida. |
 | `chord` | `string` | Nome do acorde para execução no sintetizador (ex: `"C"`, `"Am"`, `"G"`). |
-| `lyrics` | `object` | Objeto de letra avançada contendo sílabas/palavras sincronizadas. |
+| `velocity` | `int` | Intensidade do volume (0-127). |
+| `articulation` | `string` | Tipo de articulação (ex: `"legato"`, `"staccato"`). |
+| `syllables` | `array` | Lista de objetos de sílabas para sincronização detalhada e notas musicais. |
+
+### Estrutura de Sílabas (`syllables`)
+
+Para um controle mais preciso do karaokê e avaliação de afinação, você pode detalhar as sílabas dentro de um evento da timeline:
+
+| Campo | Tipo | Descrição |
+| :--- | :--- | :--- |
+| `text` | `string` | O texto da sílaba (ex: `"Pa"`, `"ra"`, `"béns"`). |
+| `offset_ms` | `int64` | Tempo de início da sílaba relativo ao `time_ms` do evento pai. |
+| `duration_ms` | `int64` | Duração da sílaba em milissegundos. |
+| `pitch` | `string` | Nota musical esperada para a melodia (ex: `"G4"`, `"C5"`). |
 
 ---
 
@@ -65,7 +78,7 @@ timeline:
     lyric: "Comi uma fruta e tomei um café"
 ```
 
-### 2. Exemplo em JSON (Com Wrapper `metadata`)
+### 2. Exemplo em JSON (Avançado com Sílabas)
 
 ```json
 {
@@ -80,7 +93,23 @@ timeline:
       "time_ms": 1000,
       "duration_ms": 2000,
       "chord": "E",
-      "lyric": "Quando eu digo que não quero mais você"
+      "lyric": "Quando",
+      "velocity": 100,
+      "articulation": "legato",
+      "syllables": [
+        {
+          "text": "Quan",
+          "offset_ms": 0,
+          "duration_ms": 1000,
+          "pitch": "E4"
+        },
+        {
+          "text": "do",
+          "offset_ms": 1000,
+          "duration_ms": 1000,
+          "pitch": "F#4"
+        }
+      ]
     },
     {
       "time_ms": 3000,
@@ -99,3 +128,4 @@ timeline:
 1. **Validação do Título**: O campo `title` é obrigatório. Se um arquivo for criado sem título, a biblioteca do Pioke irá ignorá-lo automaticamente ao escanear a pasta.
 2. **Nomes de Acordes**: Utilize notação de cifra padrão (ex: `C`, `C#`, `Db`, `Dm`, `E`, `Em`, `G7`).
 3. **Ordenação Temporal**: Certifique-se de que os valores de `time_ms` estão em ordem crescente na lista `timeline`.
+4. **Fallback de Sílabas**: Se o campo `syllables` não for fornecido, o Pioke criará automaticamente uma sílaba única usando o texto do campo `lyric` e a duração total do evento.
