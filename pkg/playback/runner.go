@@ -5,7 +5,6 @@ package playback
 
 import (
 	"fmt"
-	"time"
 
 	"pioke/pkg/audio"
 	"pioke/pkg/engine"
@@ -16,15 +15,23 @@ import (
 )
 
 // Run inicializa a TUI, o motor de reprodução e o sintetizador de áudio para a música informada.
-// Bloqueia até o encerramento da TUI. Se outputFile não for vazio, sintetiza a música completa
-// (incluindo as notas de melodia por sílaba, quando presentes) e grava em um arquivo WAV ao final.
+// Bloqueia até o encerramento da TUI. Se outputFile não for vazio, grava o mesmo áudio sintetizado
+// em um arquivo WAV ao final.
 func Run(s *model.Song, termUI *tui.TerminalUI, outputFile string) error {
 	termUI.DisplayHeader(s)
 	if err := termUI.Init(); err != nil {
 		return fmt.Errorf("erro ao inicializar TUI: %w", err)
 	}
 
+	// A reprodução ao vivo toca o mesmo buffer PCM pré-renderizado que seria gravado no WAV, em
+	// vez de sintetizar nota a nota em tempo real — assim ela soa exatamente igual ao arquivo
+	// exportado, sem depender de um agendador em tempo real (sujeito a atraso de GC, troca de
+	// goroutine, jitter do SO) para acertar cada troca de nota.
+	pcm := synth.RenderSequence(buildSegments(s))
+
 	audioSynth := audio.NewSynth()
+	audioSynth.Play(pcm)
+
 	eng := engine.NewEngine(s)
 	eng.Play()
 
@@ -32,53 +39,7 @@ func Run(s *model.Song, termUI *tui.TerminalUI, outputFile string) error {
 
 	go func() {
 		defer close(doneChan)
-
-		var currentEvent *model.TimelineEvent
-		currentSyllableIdx := -1
-
 		for pbEvent := range eng.Events() {
-			// Evento de nível superior mudou (novo acorde/linha, ou silêncio entre eventos)
-			if pbEvent.ActiveEvent != currentEvent {
-				currentEvent = pbEvent.ActiveEvent
-				currentSyllableIdx = -1
-
-				switch {
-				case currentEvent == nil:
-					audioSynth.PlayChord("")
-				case len(currentEvent.Syllables) == 0:
-					if chord := chordOf(currentEvent); chord != "" {
-						dur := currentEvent.DurationMS
-						if dur <= 0 {
-							dur = 800
-						}
-						audioSynth.PlayChordFor(chord, time.Duration(dur)*time.Millisecond)
-					}
-				}
-				// Eventos com sílabas: a primeira nota é disparada abaixo, no bloco de sílabas.
-			}
-
-			// Dentro do evento ativo, avança pelas sílabas (notas de melodia) conforme o tempo passa
-			if currentEvent != nil && len(currentEvent.Syllables) > 0 {
-				elapsedMS := pbEvent.CurrentTimeMS - currentEvent.TimeMS
-				idx := activeSyllableIndex(currentEvent.Syllables, elapsedMS)
-				if idx != currentSyllableIdx {
-					currentSyllableIdx = idx
-					if idx >= 0 {
-						syl := currentEvent.Syllables[idx]
-						dur := syl.DurationMS
-						if dur <= 0 {
-							dur = 200
-						}
-
-						if syl.Pitch != "" {
-							audioSynth.PlayNote(syl.Pitch, time.Duration(dur)*time.Millisecond)
-						} else if chord := chordOf(currentEvent); chord != "" {
-							audioSynth.PlayChordFor(chord, time.Duration(dur)*time.Millisecond)
-						}
-					}
-				}
-			}
-
 			_ = termUI.RenderTick(ui.PlaybackEvent{
 				Song:     s,
 				Current:  pbEvent.ActiveEvent,
@@ -95,12 +56,12 @@ func Run(s *model.Song, termUI *tui.TerminalUI, outputFile string) error {
 	_ = termUI.Run()
 
 	eng.Stop()
+	audioSynth.Stop()
 
 	if outputFile == "" {
 		return nil
 	}
 
-	pcm := synth.RenderSequence(buildSegments(s))
 	if len(pcm) == 0 {
 		fmt.Println("\nNenhum áudio gerado para gravar.")
 		return nil
@@ -185,18 +146,4 @@ func buildSegments(s *model.Song) []synth.Segment {
 	}
 
 	return segs
-}
-
-// activeSyllableIndex retorna o índice da última sílaba cujo offset_ms já foi alcançado, ou -1
-// se o tempo decorrido ainda não atingiu a primeira sílaba. Assume syllables ordenadas por offset_ms.
-func activeSyllableIndex(syllables []model.Syllable, elapsedMS int64) int {
-	idx := -1
-	for i := range syllables {
-		if syllables[i].OffsetMS <= elapsedMS {
-			idx = i
-		} else {
-			break
-		}
-	}
-	return idx
 }

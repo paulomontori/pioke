@@ -1,6 +1,7 @@
 package audio
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"time"
@@ -10,20 +11,22 @@ import (
 	"github.com/ebitengine/oto/v3"
 )
 
-// Synth representa a interface de saída de áudio ao vivo: um único oto.Player de longa duração
-// alimentado por liveVoice, em vez de um novo player para cada nota — é isso que evita o
-// "picotado" ao trocar de nota rapidamente (ex: uma linha de melodia importada de MusicXML).
+// Synth representa a interface de saída de áudio: um contexto Oto de longa duração que toca um
+// buffer PCM pré-renderizado (o mesmo produzido por synth.RenderSequence para o WAV), em vez de
+// sintetizar nota a nota em tempo real a partir de um agendador. Isso garante que a reprodução ao
+// vivo soa exatamente como o arquivo exportado: sem risco de uma troca de nota deixar de ser
+// amostrada por atraso do agendador em tempo real (GC, troca de goroutine, jitter do SO, etc.) —
+// quem faz a temporização real é o próprio driver de áudio, lendo de um buffer já correto.
 type Synth struct {
 	ctx     *oto.Context
 	player  *oto.Player
-	voice   *liveVoice
 	enabled bool
 }
 
 var audioDebug = os.Getenv("PIOKE_AUDIO_DEBUG") != ""
 
-// NewSynth inicializa o contexto de áudio do Oto v3 e já inicia o player contínuo (em silêncio
-// até a primeira chamada a PlayChord/PlayNote).
+// NewSynth inicializa o contexto de áudio do Oto v3. Chame Play para iniciar a reprodução de um
+// buffer PCM.
 func NewSynth() *Synth {
 	op := &oto.NewContextOptions{
 		SampleRate:   synth.SampleRate,
@@ -39,11 +42,19 @@ func NewSynth() *Synth {
 
 	<-ready
 
-	voice := newLiveVoice(synth.SampleRate)
-	player := otoCtx.NewPlayer(voice)
-	player.Play()
+	return &Synth{ctx: otoCtx, enabled: true}
+}
 
-	s := &Synth{ctx: otoCtx, player: player, voice: voice, enabled: true}
+// Play inicia a reprodução do buffer PCM estéreo 16-bit informado — tipicamente
+// synth.RenderSequence(segments), a mesma sequência determinística usada na gravação WAV.
+func (s *Synth) Play(pcm []byte) {
+	if !s.enabled || len(pcm) == 0 {
+		return
+	}
+
+	player := s.ctx.NewPlayer(bytes.NewReader(pcm))
+	player.Play()
+	s.player = player
 
 	if audioDebug {
 		go func() {
@@ -54,46 +65,11 @@ func NewSynth() *Synth {
 			}
 		}()
 	}
-
-	return s
 }
 
-// PlayChord toca o acorde (ou silencia, se chord == "") continuamente até a próxima chamada.
-func (s *Synth) PlayChord(chord string) {
-	if !s.enabled {
-		return
+// Stop pausa a reprodução em andamento, se houver.
+func (s *Synth) Stop() {
+	if s.player != nil {
+		s.player.Pause()
 	}
-	if chord == "" {
-		s.voice.SetFreqs(nil)
-		return
-	}
-	s.voice.SetFreqs(synth.GetChordFrequencies(chord))
-}
-
-// PlayChordFor toca o acorde continuamente; duration é ignorado — quem decide até quando o
-// acorde soa é a próxima chamada a PlayChord/PlayChordFor/PlayNote/PlayChord(""), disparada
-// pelo laço de reprodução (pkg/playback) no instante certo da timeline. O parâmetro existe só
-// para manter a assinatura estável nos chamadores existentes.
-func (s *Synth) PlayChordFor(chord string, _ time.Duration) {
-	s.PlayChord(chord)
-}
-
-// PlayNote toca uma única nota de melodia (ex: "G4", "C#5") continuamente — usado para
-// reproduzir as notas de syllables[].pitch em sequência. duration é ignorado pelo mesmo motivo
-// descrito em PlayChordFor.
-func (s *Synth) PlayNote(noteName string, _ time.Duration) {
-	if !s.enabled || noteName == "" {
-		return
-	}
-	freq, ok := synth.NoteNameToFrequency(noteName)
-	if !ok {
-		if audioDebug {
-			fmt.Printf("[AUDIO DEBUG] PlayNote(%q): pitch não reconhecido\n", noteName)
-		}
-		return
-	}
-	if audioDebug {
-		fmt.Printf("[AUDIO DEBUG] PlayNote(%q) -> %.2fHz\n", noteName, freq)
-	}
-	s.voice.SetFreqs([]float64{freq})
 }
