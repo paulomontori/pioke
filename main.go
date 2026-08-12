@@ -8,15 +8,19 @@ import (
 
 	"pioke/pkg/playback"
 	"pioke/pkg/song"
+	"pioke/pkg/synth"
 	"pioke/pkg/ui/tui"
 )
 
 func main() {
 	var outputFile string
 	flag.StringVar(&outputFile, "out", "", "Caminho do arquivo WAV de saída para salvar o áudio gerado (ex: output.wav)")
+	var timbreFlag string
+	flag.StringVar(&timbreFlag, "timbre", "", "Timbre de síntese: additive (padrão, harmônicos aditivos) ou karplus (corda dedilhada)")
 	flag.Parse()
 
-	// Fallback para capturar a flag -out caso tenha sido informada após argumentos posicionais
+	// Fallback para capturar as flags -out/-timbre caso tenham sido informadas após argumentos
+	// posicionais (flag.Parse() para no primeiro argumento não reconhecido como flag).
 	if outputFile == "" {
 		for i, arg := range os.Args {
 			if (arg == "-out" || arg == "--out") && i+1 < len(os.Args) {
@@ -31,10 +35,29 @@ func main() {
 			}
 		}
 	}
+	if timbreFlag == "" {
+		for i, arg := range os.Args {
+			if (arg == "-timbre" || arg == "--timbre") && i+1 < len(os.Args) {
+				timbreFlag = os.Args[i+1]
+				break
+			} else if strings.HasPrefix(arg, "-timbre=") {
+				timbreFlag = strings.TrimPrefix(arg, "-timbre=")
+				break
+			} else if strings.HasPrefix(arg, "--timbre=") {
+				timbreFlag = strings.TrimPrefix(arg, "--timbre=")
+				break
+			}
+		}
+	}
+
+	timbre, err := synth.ParseTimbre(timbreFlag)
+	if err != nil {
+		log.Fatalf("%v\n", err)
+	}
 
 	sampleFile := "songs/parabens.yaml"
 	for _, arg := range os.Args[1:] {
-		if !strings.HasPrefix(arg, "-") && arg != outputFile {
+		if !strings.HasPrefix(arg, "-") && arg != outputFile && arg != timbreFlag {
 			sampleFile = arg
 			break
 		}
@@ -45,7 +68,7 @@ func main() {
 		log.Fatalf("Erro ao carregar a música %s: %v\n", sampleFile, err)
 	}
 
-	if err := playback.Run(s, tui.NewTUI(), outputFile); err != nil {
+	if err := playback.Run(s, tui.NewTUI(), outputFile, timbre); err != nil {
 		log.Fatalf("%v\n", err)
 	}
 }
