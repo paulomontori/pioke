@@ -2,6 +2,7 @@ package audio
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"pioke/pkg/synth"
@@ -13,9 +14,13 @@ import (
 // alimentado por liveVoice, em vez de um novo player para cada nota — é isso que evita o
 // "picotado" ao trocar de nota rapidamente (ex: uma linha de melodia importada de MusicXML).
 type Synth struct {
+	ctx     *oto.Context
+	player  *oto.Player
 	voice   *liveVoice
 	enabled bool
 }
+
+var audioDebug = os.Getenv("PIOKE_AUDIO_DEBUG") != ""
 
 // NewSynth inicializa o contexto de áudio do Oto v3 e já inicia o player contínuo (em silêncio
 // até a primeira chamada a PlayChord/PlayNote).
@@ -38,7 +43,19 @@ func NewSynth() *Synth {
 	player := otoCtx.NewPlayer(voice)
 	player.Play()
 
-	return &Synth{voice: voice, enabled: true}
+	s := &Synth{ctx: otoCtx, player: player, voice: voice, enabled: true}
+
+	if audioDebug {
+		go func() {
+			for i := 0; i < 30; i++ {
+				time.Sleep(time.Second)
+				fmt.Printf("[AUDIO DEBUG t=%ds] IsPlaying=%v BufferedSize=%d Err=%v Volume=%v\n",
+					i+1, player.IsPlaying(), player.BufferedSize(), player.Err(), player.Volume())
+			}
+		}()
+	}
+
+	return s
 }
 
 // PlayChord toca o acorde (ou silencia, se chord == "") continuamente até a próxima chamada.
@@ -70,7 +87,13 @@ func (s *Synth) PlayNote(noteName string, _ time.Duration) {
 	}
 	freq, ok := synth.NoteNameToFrequency(noteName)
 	if !ok {
+		if audioDebug {
+			fmt.Printf("[AUDIO DEBUG] PlayNote(%q): pitch não reconhecido\n", noteName)
+		}
 		return
+	}
+	if audioDebug {
+		fmt.Printf("[AUDIO DEBUG] PlayNote(%q) -> %.2fHz\n", noteName, freq)
 	}
 	s.voice.SetFreqs([]float64{freq})
 }
