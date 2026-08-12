@@ -13,12 +13,12 @@ import (
 	"pioke/pkg/parser"
 )
 
-// LoadMetadata lê apenas os metadados/cabeçalho de um arquivo .json, .yaml/.yml ou .musicxml/.xml
+// LoadMetadata lê apenas os metadados/cabeçalho de um arquivo .json, .yaml/.yml,
+// .musicxml/.xml ou .mxl
 func LoadMetadata(filePath string) (*SongMetadata, error) {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
-	if ext == ".musicxml" || ext == ".xml" {
-		s, err := parser.ParseMusicXML(filePath)
+	if s, ok, err := loadScoreFile(filePath, ext); ok {
 		if err != nil || s.Title == "" {
 			return nil, fmt.Errorf("formato de música ou metadados inválidos em: %s", filePath)
 		}
@@ -64,13 +64,29 @@ func LoadMetadata(filePath string) (*SongMetadata, error) {
 	return nil, fmt.Errorf("formato de música ou metadados inválidos em: %s", filePath)
 }
 
+// loadScoreFile despacha para o parser de partitura (MusicXML texto ou .mxl comprimido)
+// quando a extensão corresponde. O segundo valor de retorno indica se a extensão foi
+// reconhecida — quando falso, o chamador deve seguir para a lógica de JSON/YAML.
+func loadScoreFile(filePath, ext string) (*model.Song, bool, error) {
+	switch ext {
+	case ".musicxml", ".xml":
+		s, err := parser.ParseMusicXML(filePath)
+		return s, true, err
+	case ".mxl":
+		s, err := parser.ParseMXL(filePath)
+		return s, true, err
+	default:
+		return nil, false, nil
+	}
+}
+
 // LoadSong realiza a leitura e conversão do arquivo completo para model.Song
-// (.json, .yaml/.yml ou .musicxml/.xml)
+// (.json, .yaml/.yml, .musicxml/.xml ou .mxl)
 func LoadSong(filePath string) (*model.Song, error) {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
-	if ext == ".musicxml" || ext == ".xml" {
-		return parser.ParseMusicXML(filePath)
+	if s, ok, err := loadScoreFile(filePath, ext); ok {
+		return s, err
 	}
 
 	data, err := os.ReadFile(filePath)

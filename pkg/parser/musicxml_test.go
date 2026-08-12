@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"archive/zip"
 	"os"
 	"testing"
 
@@ -212,6 +213,144 @@ func TestFifthsToKeyName(t *testing.T) {
 	}
 	if got := fifthsToKeyName(0, "minor"); got != "Am" {
 		t.Errorf("fifthsToKeyName(0, \"minor\") = %q, esperado \"Am\"", got)
+	}
+}
+
+// testTwoVoicePianoMusicXML representa um compasso de piano com duas vozes simultâneas
+// (mão direita = voice 1, mão esquerda = voice 2, como em Für Elise): a voz 1 tem duas
+// mínimas (C5, D5); depois de um <backup> que rebobina o compasso inteiro, a voz 2 toca uma
+// semibreve (C3) sozinha. Só a voz 1 (a primeira encontrada no documento) deve virar melodia.
+const testTwoVoicePianoMusicXML = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <work><work-title>Duas Vozes</work-title></work>
+  <part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction><sound tempo="60"/></direction>
+      <note>
+        <pitch><step>C</step><octave>5</octave></pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>5</octave></pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+      </note>
+      <backup><duration>4</duration></backup>
+      <note>
+        <pitch><step>C</step><octave>3</octave></pitch>
+        <duration>4</duration>
+        <voice>2</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+`
+
+func TestParseMusicXML_MultiVoiceOnlyFirstVoiceKept(t *testing.T) {
+	path := writeTempMusicXML(t, testTwoVoicePianoMusicXML)
+
+	s, err := ParseMusicXML(path)
+	if err != nil {
+		t.Fatalf("ParseMusicXML falhou: %v", err)
+	}
+	if len(s.Timeline) != 1 {
+		t.Fatalf("Esperado 1 evento (1 compasso), obtido %d", len(s.Timeline))
+	}
+
+	ev := s.Timeline[0]
+	if ev.TimeMS != 0 || ev.DurationMS != 4000 {
+		t.Errorf("Evento: TimeMS/DurationMS esperados 0/4000 (largura total do compasso), obtidos %d/%d", ev.TimeMS, ev.DurationMS)
+	}
+	// Apenas as 2 notas da voice 1 (mão direita) devem aparecer — a nota da voice 2 (mão
+	// esquerda, depois do <backup>) precisa ser ignorada, não concatenada como se fosse melodia.
+	assertSyllables(t, "Evento", ev.Syllables, []model.Syllable{
+		{Text: "", OffsetMS: 0, DurationMS: 2000, Pitch: "C5"},
+		{Text: "", OffsetMS: 2000, DurationMS: 2000, Pitch: "D5"},
+	})
+}
+
+func writeTempMXL(t *testing.T, entries map[string]string) string {
+	t.Helper()
+	tmpFile, err := os.CreateTemp("", "song_test_*.mxl")
+	if err != nil {
+		t.Fatalf("erro ao criar arquivo temporário: %v", err)
+	}
+	t.Cleanup(func() { os.Remove(tmpFile.Name()) })
+
+	zw := zip.NewWriter(tmpFile)
+	for name, content := range entries {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatalf("erro ao criar entrada %s no zip: %v", name, err)
+		}
+		if _, err := w.Write([]byte(content)); err != nil {
+			t.Fatalf("erro ao escrever entrada %s no zip: %v", name, err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("erro ao fechar zip: %v", err)
+	}
+	tmpFile.Close()
+	return tmpFile.Name()
+}
+
+const testContainerXML = `<?xml version="1.0" encoding="UTF-8"?>
+<container>
+  <rootfiles>
+    <rootfile full-path="score.xml"/>
+  </rootfiles>
+</container>
+`
+
+func TestParseMXL_WithContainerManifest(t *testing.T) {
+	path := writeTempMXL(t, map[string]string{
+		"META-INF/container.xml": testContainerXML,
+		"score.xml":              testParabensMusicXML,
+	})
+
+	s, err := ParseMXL(path)
+	if err != nil {
+		t.Fatalf("ParseMXL falhou: %v", err)
+	}
+	if s.Title != "Parabéns a Você" {
+		t.Errorf("Title esperado 'Parabéns a Você', obtido %q", s.Title)
+	}
+	if len(s.Timeline) != 2 {
+		t.Errorf("Esperado 2 eventos, obtido %d", len(s.Timeline))
+	}
+}
+
+func TestParseMXL_WithoutManifestFallsBackToFirstXML(t *testing.T) {
+	path := writeTempMXL(t, map[string]string{
+		"minha_partitura.xml": testParabensMusicXML,
+	})
+
+	s, err := ParseMXL(path)
+	if err != nil {
+		t.Fatalf("ParseMXL falhou: %v", err)
+	}
+	if s.Title != "Parabéns a Você" {
+		t.Errorf("Title esperado 'Parabéns a Você', obtido %q", s.Title)
+	}
+}
+
+func TestParseMXL_NotAZip(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "not_a_zip_*.mxl")
+	if err != nil {
+		t.Fatalf("erro ao criar arquivo temporário: %v", err)
+	}
+	t.Cleanup(func() { os.Remove(tmpFile.Name()) })
+	tmpFile.WriteString("isto não é um zip")
+	tmpFile.Close()
+
+	if _, err := ParseMXL(tmpFile.Name()); err == nil {
+		t.Error("esperava erro ao tentar abrir um .mxl que não é um zip válido")
 	}
 }
 

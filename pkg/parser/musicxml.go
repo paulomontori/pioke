@@ -1,35 +1,41 @@
 package parser
 
 import (
+	"archive/zip"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"pioke/pkg/model"
 )
 
-// ParseMusicXML lê um arquivo MusicXML (formato .musicxml/.xml partwise) e o converte para
-// model.Song, sincronizando letra, altura (pitch) e cifras a partir da partitura.
+// ParseMusicXML lê um arquivo MusicXML em texto puro (.musicxml/.xml partwise) e o converte
+// para model.Song. Para o formato comprimido (.mxl), use ParseMXL.
 //
-// Escopo suportado (subconjunto pragmático, suficiente para uma "lead sheet" de karaokê):
+// Escopo suportado (subconjunto pragmático, suficiente para uma "lead sheet" de karaokê ou
+// uma partitura instrumental simples):
 //   - Apenas <score-partwise> (não <score-timewise>).
 //   - Usa apenas uma <part> — a que tiver nome sugestivo de voz/melodia (ex: "Voice", "Vocal",
 //     "Melody"), ou a primeira, se nenhuma corresponder. Outras partes (ex: acompanhamento em
 //     pauta própria) são ignoradas nesta versão.
-//   - Não trata múltiplas vozes simultâneas na mesma parte (<backup>/<forward>): assume notas
-//     sequenciais em ordem de leitura, como em uma linha melódica cantada.
-//   - Notas marcadas com <chord/> (soando junto da nota anterior) são ignoradas — sem
-//     harmonização polifônica na própria melodia.
-//   - Cada <measure> vira um model.TimelineEvent; cada <note> dentro dele vira um
+//   - Dentro da parte escolhida, usa apenas a primeira <voice> encontrada no documento (ex:
+//     a mão direita/melodia em uma pauta dupla de piano) — <backup>/<forward> são respeitados
+//     para manter o cursor de tempo correto, mas notas de outras vozes (ex: mão esquerda) são
+//     ignoradas. Sem isso, duas vozes intercaladas virariam uma única melodia sem sentido.
+//   - Notas marcadas com <chord/> (soando junto da nota anterior, acordes na própria melodia)
+//     são ignoradas — sem harmonização polifônica na melodia.
+//   - Cada <measure> vira um model.TimelineEvent; cada <note> da voz escolhida vira um
 //     model.Syllable (offset/duração relativos ao início do compasso, mais o pitch).
 //   - <tie type="stop"> estende a duração da sílaba anterior em vez de criar uma nova
 //     (nota ligada = mesmo ataque, duração maior).
 //   - <harmony> (cifra) é convertida para o formato curto usado por synth.GetChordFrequencies
-//     (ex: "Am7", "G7", "Cmaj7") e vale a partir daquele ponto até a próxima mudança.
+//     (ex: "Am7", "G7", "Cmaj7") e vale a partir daquele ponto até a próxima mudança. Partituras
+//     puramente instrumentais (sem cifra) tocam apenas a melodia, sem acompanhamento.
 //   - O andamento (<sound tempo="…">) pode mudar ao longo da partitura; cada nota usa o
 //     andamento vigente no momento em que aparece para calcular sua duração em milissegundos.
 func ParseMusicXML(filePath string) (*model.Song, error) {
@@ -37,7 +43,90 @@ func ParseMusicXML(filePath string) (*model.Song, error) {
 	if err != nil {
 		return nil, fmt.Errorf("erro ao ler arquivo MusicXML: %w", err)
 	}
+	return parseMusicXMLBytes(data)
+}
 
+// ParseMXL lê um arquivo MusicXML comprimido (.mxl — um ZIP contendo META-INF/container.xml
+// e o documento score-partwise) e o converte para model.Song, reaproveitando a mesma lógica
+// de ParseMusicXML sobre o XML descompactado.
+func ParseMXL(filePath string) (*model.Song, error) {
+	zr, err := zip.OpenReader(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao abrir arquivo .mxl (zip): %w", err)
+	}
+	defer zr.Close()
+
+	rootName := mxlRootFile(zr.File)
+	if rootName == "" {
+		return nil, fmt.Errorf(".mxl sem nenhum documento MusicXML reconhecível")
+	}
+
+	var root *zip.File
+	for _, f := range zr.File {
+		if f.Name == rootName {
+			root = f
+			break
+		}
+	}
+	if root == nil {
+		return nil, fmt.Errorf(".mxl: arquivo raiz declarado (%s) não encontrado dentro do zip", rootName)
+	}
+
+	rc, err := root.Open()
+	if err != nil {
+		return nil, fmt.Errorf("erro ao abrir %s dentro do .mxl: %w", rootName, err)
+	}
+	defer rc.Close()
+
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao ler %s dentro do .mxl: %w", rootName, err)
+	}
+
+	return parseMusicXMLBytes(data)
+}
+
+// mxlRootFile determina qual entrada do .mxl é o documento MusicXML principal: lê o manifesto
+// META-INF/container.xml quando presente (como definido pelo formato .mxl), e cai para a
+// primeira entrada .xml/.musicxml fora de META-INF/ caso o manifesto esteja ausente ou inválido.
+func mxlRootFile(files []*zip.File) string {
+	for _, f := range files {
+		if f.Name != "META-INF/container.xml" {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			break
+		}
+		data, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			break
+		}
+		var container mxlContainer
+		if err := xml.Unmarshal(data, &container); err == nil {
+			for _, rf := range container.RootFiles {
+				if rf.FullPath != "" {
+					return rf.FullPath
+				}
+			}
+		}
+		break
+	}
+
+	for _, f := range files {
+		if strings.HasPrefix(f.Name, "META-INF/") {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(f.Name))
+		if ext == ".xml" || ext == ".musicxml" {
+			return f.Name
+		}
+	}
+	return ""
+}
+
+func parseMusicXMLBytes(data []byte) (*model.Song, error) {
 	var doc mxScorePartwise
 	if err := xml.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("erro ao decodificar MusicXML: %w", err)
@@ -62,12 +151,24 @@ func ParseMusicXML(filePath string) (*model.Song, error) {
 	bpm := 0.0
 	divisions := 1
 	currentChord := ""
+	selectedVoice := "" // primeira <voice> encontrada no documento; demais vozes são ignoradas
 	var cursorMS int64
 
 	for _, measure := range part.Measures {
 		measureStartMS := cursorMS
+		var posMS int64    // posição dentro do compasso, afetada por <backup>/<forward>
+		var maxPosMS int64 // maior posição alcançada por qualquer voz = duração real do compasso
 		var syllables []model.Syllable
 		measureChord := ""
+
+		divisionsToMS := func(divisionUnits int64) int64 {
+			effectiveBPM := bpm
+			if effectiveBPM <= 0 {
+				effectiveBPM = defaultBPM
+			}
+			quarterMS := 60000.0 / effectiveBPM
+			return int64(math.Round(float64(divisionUnits) / float64(divisions) * quarterMS))
+		}
 
 		for _, item := range measure.Items {
 			switch {
@@ -93,45 +194,74 @@ func ParseMusicXML(filePath string) (*model.Song, error) {
 					measureChord = currentChord
 				}
 
+			case item.Backup != nil:
+				posMS -= divisionsToMS(item.Backup.Duration)
+				if posMS < 0 {
+					posMS = 0
+				}
+
+			case item.Forward != nil:
+				posMS += divisionsToMS(item.Forward.Duration)
+				if posMS > maxPosMS {
+					maxPosMS = posMS
+				}
+
 			case item.Note != nil:
 				n := item.Note
-				effectiveBPM := bpm
-				if effectiveBPM <= 0 {
-					effectiveBPM = defaultBPM
-				}
-				quarterMS := 60000.0 / effectiveBPM
-				durMS := int64(math.Round(float64(n.Duration) / float64(divisions) * quarterMS))
-
-				switch {
-				case n.Chord != nil:
+				if n.Chord != nil {
 					// Nota simultânea à anterior — fora do escopo (melodia monofônica).
 					continue
-				case n.Rest != nil:
-					cursorMS += durMS
+				}
+
+				durMS := divisionsToMS(n.Duration)
+
+				voice := n.Voice
+				if voice == "" {
+					voice = "1"
+				}
+				if selectedVoice == "" {
+					selectedVoice = voice
+				}
+				if voice != selectedVoice {
+					// Nota de outra voz (ex: mão esquerda numa pauta de piano): não faz parte
+					// da melodia que importamos, mas o cursor de tempo ainda avança com ela.
+					posMS += durMS
+					if posMS > maxPosMS {
+						maxPosMS = posMS
+					}
 					continue
+				}
+
+				switch {
+				case n.Rest != nil:
+					posMS += durMS
 				case hasTieStop(n.Tie) && len(syllables) > 0:
 					// Nota ligada à anterior: estende a sílaba, sem novo ataque.
 					syllables[len(syllables)-1].DurationMS += durMS
-					cursorMS += durMS
-					continue
+					posMS += durMS
+				default:
+					text := ""
+					if n.Lyric != nil {
+						text = n.Lyric.Text
+					}
+					syllables = append(syllables, model.Syllable{
+						Text:       text,
+						OffsetMS:   posMS,
+						DurationMS: durMS,
+						Pitch:      pitchName(n.Pitch),
+					})
+					posMS += durMS
 				}
-
-				text := ""
-				if n.Lyric != nil {
-					text = n.Lyric.Text
+				if posMS > maxPosMS {
+					maxPosMS = posMS
 				}
-				syllables = append(syllables, model.Syllable{
-					Text:       text,
-					OffsetMS:   cursorMS - measureStartMS,
-					DurationMS: durMS,
-					Pitch:      pitchName(n.Pitch),
-				})
-				cursorMS += durMS
 			}
 		}
 
+		cursorMS = measureStartMS + maxPosMS
+
 		if len(syllables) == 0 {
-			continue // compasso só com atributos/silêncio, sem notas — não gera evento
+			continue // compasso sem notas na voz escolhida — não gera evento
 		}
 		if measureChord == "" {
 			measureChord = currentChord
@@ -144,7 +274,7 @@ func ParseMusicXML(filePath string) (*model.Song, error) {
 
 		s.Timeline = append(s.Timeline, model.TimelineEvent{
 			TimeMS:     measureStartMS,
-			DurationMS: cursorMS - measureStartMS,
+			DurationMS: maxPosMS,
 			ChordStr:   measureChord,
 			Lyric:      lyricLine.String(),
 			Syllables:  syllables,
@@ -326,6 +456,8 @@ type mxMeasureItem struct {
 	Harmony    *mxHarmony
 	Attributes *mxAttributes
 	Sound      *mxSound
+	Backup     *mxBackup
+	Forward    *mxForward
 }
 
 type mxMeasure struct {
@@ -375,6 +507,18 @@ func (m *mxMeasure) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 				if dir.Sound != nil {
 					m.Items = append(m.Items, mxMeasureItem{Sound: dir.Sound})
 				}
+			case "backup":
+				var b mxBackup
+				if err := d.DecodeElement(&b, &t); err != nil {
+					return err
+				}
+				m.Items = append(m.Items, mxMeasureItem{Backup: &b})
+			case "forward":
+				var f mxForward
+				if err := d.DecodeElement(&f, &t); err != nil {
+					return err
+				}
+				m.Items = append(m.Items, mxMeasureItem{Forward: &f})
 			default:
 				if err := d.Skip(); err != nil {
 					return err
@@ -431,8 +575,19 @@ type mxNote struct {
 	Chord    *struct{} `xml:"chord"`
 	Pitch    *mxPitch  `xml:"pitch"`
 	Duration int64     `xml:"duration"`
+	Voice    string    `xml:"voice"`
 	Tie      []mxTie   `xml:"tie"`
 	Lyric    *mxLyric  `xml:"lyric"`
+}
+
+// mxBackup/mxForward implementam o "cursor de tempo" do MusicXML: <backup> rebobina a posição
+// (usado para começar a próxima voz/pauta no mesmo instante), <forward> avança sem soar nota.
+type mxBackup struct {
+	Duration int64 `xml:"duration"`
+}
+
+type mxForward struct {
+	Duration int64 `xml:"duration"`
 }
 
 type mxPitch struct {
@@ -448,4 +603,14 @@ type mxTie struct {
 type mxLyric struct {
 	Syllabic string `xml:"syllabic"`
 	Text     string `xml:"text"`
+}
+
+// mxlContainer decodifica META-INF/container.xml, o manifesto que aponta para o documento
+// MusicXML principal dentro de um arquivo .mxl.
+type mxlContainer struct {
+	RootFiles []mxlRootFileEntry `xml:"rootfiles>rootfile"`
+}
+
+type mxlRootFileEntry struct {
+	FullPath string `xml:"full-path,attr"`
 }
