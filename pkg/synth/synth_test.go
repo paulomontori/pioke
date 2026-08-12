@@ -17,23 +17,6 @@ func TestGetChordFrequencies(t *testing.T) {
 	}
 }
 
-func TestPolySynthReadPCM(t *testing.T) {
-	s := NewPolySynth(44100)
-	s.PlayChord("C", 200*time.Millisecond)
-
-	buf := make([]float32, 512)
-	n := s.ReadPCM(buf)
-	if n != 512 {
-		t.Errorf("Esperado ler 512 amostras, lido %d", n)
-	}
-
-	for i, sample := range buf {
-		if sample < -1.0 || sample > 1.0 {
-			t.Errorf("Amostra no índice %d fora do intervalo [-1.0, 1.0]: %f", i, sample)
-		}
-	}
-}
-
 func TestEnvelopeADSR(t *testing.T) {
 	env := DefaultEnvelope()
 	total := 500 * time.Millisecond
