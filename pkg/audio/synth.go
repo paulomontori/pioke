@@ -1,7 +1,6 @@
 package audio
 
 import (
-	"bytes"
 	"fmt"
 	"time"
 
@@ -10,13 +9,16 @@ import (
 	"github.com/ebitengine/oto/v3"
 )
 
-// Synth representa a interface de saída de áudio alimentada pelo gerador de síntese
+// Synth representa a interface de saída de áudio ao vivo: um único oto.Player de longa duração
+// alimentado por liveVoice, em vez de um novo player para cada nota — é isso que evita o
+// "picotado" ao trocar de nota rapidamente (ex: uma linha de melodia importada de MusicXML).
 type Synth struct {
-	context *oto.Context
+	voice   *liveVoice
 	enabled bool
 }
 
-// NewSynth inicializa o contexto de áudio do Oto v3
+// NewSynth inicializa o contexto de áudio do Oto v3 e já inicia o player contínuo (em silêncio
+// até a primeira chamada a PlayChord/PlayNote).
 func NewSynth() *Synth {
 	op := &oto.NewContextOptions{
 		SampleRate:   synth.SampleRate,
@@ -32,48 +34,43 @@ func NewSynth() *Synth {
 
 	<-ready
 
-	return &Synth{
-		context: otoCtx,
-		enabled: true,
-	}
+	voice := newLiveVoice(synth.SampleRate)
+	player := otoCtx.NewPlayer(voice)
+	player.Play()
+
+	return &Synth{voice: voice, enabled: true}
 }
 
-// PlayChord sintetiza o acorde com envelope ADSR (duração padrão de 800ms) e executa na placa de som
+// PlayChord toca o acorde (ou silencia, se chord == "") continuamente até a próxima chamada.
 func (s *Synth) PlayChord(chord string) {
-	s.PlayChordFor(chord, 800*time.Millisecond)
+	if !s.enabled {
+		return
+	}
+	if chord == "" {
+		s.voice.SetFreqs(nil)
+		return
+	}
+	s.voice.SetFreqs(synth.GetChordFrequencies(chord))
 }
 
-// PlayChordFor sintetiza o acorde com envelope ADSR pela duração informada e executa na placa de som
-func (s *Synth) PlayChordFor(chord string, duration time.Duration) {
-	if !s.enabled || chord == "" || duration <= 0 {
-		return
-	}
-
-	frequencies := synth.GetChordFrequencies(chord)
-	if len(frequencies) == 0 {
-		return
-	}
-
-	s.play(frequencies, duration)
+// PlayChordFor toca o acorde continuamente; duration é ignorado — quem decide até quando o
+// acorde soa é a próxima chamada a PlayChord/PlayChordFor/PlayNote/PlayChord(""), disparada
+// pelo laço de reprodução (pkg/playback) no instante certo da timeline. O parâmetro existe só
+// para manter a assinatura estável nos chamadores existentes.
+func (s *Synth) PlayChordFor(chord string, _ time.Duration) {
+	s.PlayChord(chord)
 }
 
-// PlayNote sintetiza uma única nota de melodia (ex: "G4", "C#5") pela duração informada — usado para
-// reproduzir as notas de syllables[].pitch em sequência
-func (s *Synth) PlayNote(noteName string, duration time.Duration) {
-	if !s.enabled || noteName == "" || duration <= 0 {
+// PlayNote toca uma única nota de melodia (ex: "G4", "C#5") continuamente — usado para
+// reproduzir as notas de syllables[].pitch em sequência. duration é ignorado pelo mesmo motivo
+// descrito em PlayChordFor.
+func (s *Synth) PlayNote(noteName string, _ time.Duration) {
+	if !s.enabled || noteName == "" {
 		return
 	}
-
 	freq, ok := synth.NoteNameToFrequency(noteName)
 	if !ok {
 		return
 	}
-
-	s.play([]float64{freq}, duration)
-}
-
-func (s *Synth) play(frequencies []float64, duration time.Duration) {
-	pcmData := synth.GeneratePCMWithADSR(frequencies, duration)
-	player := s.context.NewPlayer(bytes.NewReader(pcmData))
-	player.Play()
+	s.voice.SetFreqs([]float64{freq})
 }
