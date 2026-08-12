@@ -13,7 +13,8 @@ PioKe é uma engine de karaokê e sintetizador de acordes em tempo real, leve e 
 * **Sintetizador de Áudio Polifônico com Timbre Selecionável:** cálculo de frequências musicais baseado em afinação A4 (440Hz), com envelope de attack/release para evitar picotado entre notas adjacentes. Dois motores de síntese, escolhíveis em tempo de execução (flag `-timbre`): **aditivo** (fundamental + harmônicos com peso decrescente — padrão) e **Karplus-Strong** (corda dedilhada, cada nota dedilha sua própria corda do zero).
 * **Pipeline de Áudio Multiplataforma:** Reprodução de amostras PCM em tempo real via **Oto v3** (`github.com/ebitengine/oto/v3`).
 * **Camada de UI Desacoplada:** Interface `Renderer` no pacote `pkg/ui` pronta para suportar interfaces de terminal (TUI) e interfaces gráficas (GUI).
-* **Arquitetura Modular:** Separação limpa entre os pacotes `pkg/model`, `pkg/parser`, `pkg/engine`, `pkg/synth`, `pkg/audio` e `pkg/ui`.
+* **Avaliação de Canto (Scoring):** grave o microfone durante a reprodução (`-record`) e avalie depois com o subcomando `score` — detector de pitch **YIN** com gate de vozeamento (energia RMS + confiança), comparação nota-a-nota com a melodia de referência (desvio em cents, com tratamento configurável de erro de oitava), pontuação de ritmo (desvio de onset) e de cobertura, em 3 níveis de dificuldade (`easy`/`medium`/`hard`). Pacote `pkg/scoring`, desacoplado do pipeline de reprodução.
+* **Arquitetura Modular:** Separação limpa entre os pacotes `pkg/model`, `pkg/parser`, `pkg/engine`, `pkg/synth`, `pkg/audio`, `pkg/scoring` e `pkg/ui`.
 
 ---
 
@@ -57,6 +58,8 @@ PioKe é uma engine de karaokê e sintetizador de acordes em tempo real, leve e 
 │   ├── engine/            # Motor de reprodução e emissão de eventos
 │   ├── model/             # Estruturas de dados (Song, TimelineEvent, Metadata)
 │   ├── parser/            # Leitor e validador de arquivos JSON/YAML
+│   ├── playback/          # Orquestra a reprodução ao vivo + gravação opcional do microfone
+│   ├── scoring/           # Avaliação de canto: detecção de pitch (YIN) e pontuação nota-a-nota
 │   ├── synth/             # Sintetizador ADSR e cálculo de frequências
 │   └── ui/                # Abstração da UI e renderizador de terminal
 ├── doc.md                 # Documentação e especificação do projeto
@@ -124,11 +127,23 @@ go run cmd/pioke-cli/main.go
 
 * `-timbre additive|karplus` — escolhe o motor de síntese: `additive` (padrão, harmônicos aditivos) ou `karplus` (Karplus-Strong, corda dedilhada). Ex: `go run main.go -timbre karplus musica.mxl`.
 * `-out caminho.wav` — além de tocar ao vivo, grava o áudio sintetizado (com o timbre escolhido) em um arquivo WAV.
-* `-record` — grava o microfone durante a reprodução (quem estiver cantando junto), salvando em `recordings/<música>_<data-hora>.wav` mais um `.json` com metadados (música, timbre, e o offset em ms entre o início da gravação e o início real da reprodução, pra alinhar com a timeline da música depois). Pensado como primeiro passo para uma futura avaliação de qualidade do canto. Requer um microfone disponível no sistema; se a captura falhar, a música toca normalmente mesmo assim, só sem gravar.
+* `-record` — grava o microfone durante a reprodução (quem estiver cantando junto), salvando em `recordings/<música>_<data-hora>.wav` mais um `.json` com metadados (música, timbre, e o offset em ms entre o início da gravação e o início real da reprodução, pra alinhar com a timeline da música depois). Requer um microfone disponível no sistema; se a captura falhar, a música toca normalmente mesmo assim, só sem gravar. Avalie a gravação depois com o subcomando `score` (abaixo).
 
   > **Build com CGO:** a captura de microfone usa [`malgo`](https://github.com/gen2brain/malgo), que depende de CGO — é preciso ter um compilador C instalado (`gcc`) e `CGO_ENABLED=1` (padrão do Go quando há compilador disponível) para compilar o projeto. No Windows, uma forma simples de instalar: `winget install -e --id BrechtSanders.WinLibs.POSIX.UCRT` (adicione a pasta `mingw64\bin` da instalação ao PATH). No Raspberry Pi/Linux, o `gcc` costuma já estar disponível ou é um `apt install build-essential`.
 
 As flags podem vir em qualquer posição em relação ao caminho da música.
+
+### Subcomando `score`
+
+Avalia uma gravação feita com `-record` contra a melodia de referência da música original: pontuação de afinação (com detecção de pitch YIN), ritmo e cobertura, além do detalhamento nota-a-nota.
+
+```bash
+go run ./cmd/pioke-cli score recordings/minha-musica_20260812-140750.wav -level medium
+```
+
+* `<gravacao.wav>` (posicional, obrigatório) — caminho do `.wav` salvo por `-record`. O `.json` de metadados correspondente (mesmo nome base) precisa estar ao lado.
+* `-level easy|medium|hard` — nível de dificuldade (padrão `medium`). Controla a tolerância de afinação (cents), a tolerância de ritmo, como erro de oitava é tratado, e o peso de cada componente na nota final — veja `pkg/scoring/preset.go` para a tabela completa.
+* `-song caminho` — sobrescreve a música de referência; por padrão usa a música gravada nos metadados da gravação.
 
 ---
 

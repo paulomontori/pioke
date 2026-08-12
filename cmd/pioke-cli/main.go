@@ -13,6 +13,13 @@ import (
 )
 
 func main() {
+	// Subcomando "score" tem seu próprio parsing de flags e não passa pelo fluxo de reprodução
+	// abaixo (ver runScore em score.go).
+	if len(os.Args) > 1 && os.Args[1] == "score" {
+		runScore(os.Args[2:])
+		return
+	}
+
 	var outputFile string
 	flag.StringVar(&outputFile, "out", "", "Caminho do arquivo WAV de saída para salvar o áudio gerado (ex: output.wav)")
 	var timbreFlag string
