@@ -23,10 +23,10 @@ import (
 //   - Usa apenas uma <part> — a que tiver nome sugestivo de voz/melodia (ex: "Voice", "Vocal",
 //     "Melody"), ou a primeira, se nenhuma corresponder. Outras partes (ex: acompanhamento em
 //     pauta própria) são ignoradas nesta versão.
-//   - Dentro da parte escolhida, usa apenas a primeira <voice> encontrada no documento (ex:
-//     a mão direita/melodia em uma pauta dupla de piano) — <backup>/<forward> são respeitados
-//     para manter o cursor de tempo correto, mas notas de outras vozes (ex: mão esquerda) são
-//     ignoradas. Sem isso, duas vozes intercaladas virariam uma única melodia sem sentido.
+//   - Dentro da parte escolhida, a primeira <voice> encontrada no documento vira a melodia
+//     principal (letra/syllables); as demais vozes (ex: baixo de violão, mão esquerda de piano)
+//     tocam junto como acompanhamento (TimelineEvent.Accompaniment) em vez de serem descartadas —
+//     <backup>/<forward> mantêm o cursor de tempo correto entre elas.
 //   - Notas marcadas com <chord/> (soando junto da nota anterior, acordes na própria melodia)
 //     são ignoradas — sem harmonização polifônica na melodia.
 //   - Cada <measure> vira um model.TimelineEvent; cada <note> da voz escolhida vira um
@@ -159,6 +159,7 @@ func parseMusicXMLBytes(data []byte) (*model.Song, error) {
 		var posMS int64    // posição dentro do compasso, afetada por <backup>/<forward>
 		var maxPosMS int64 // maior posição alcançada por qualquer voz = duração real do compasso
 		var syllables []model.Syllable
+		var accompaniment []model.Syllable // notas de outras vozes, soando junto com a melodia
 		var lyricLine strings.Builder
 		measureChord := ""
 
@@ -224,8 +225,17 @@ func parseMusicXMLBytes(data []byte) (*model.Song, error) {
 					selectedVoice = voice
 				}
 				if voice != selectedVoice {
-					// Nota de outra voz (ex: mão esquerda numa pauta de piano): não faz parte
-					// da melodia que importamos, mas o cursor de tempo ainda avança com ela.
+					// Nota de outra voz (ex: baixo de um violão, ou mão esquerda de piano): não
+					// entra na letra/melodia principal, mas soa ao mesmo tempo — vira acompanhamento
+					// em vez de ser descartada, senão pausas na melodia (ex: dedilhado com respiro)
+					// viram silêncio total mesmo com o baixo sustentando a nota.
+					if n.Rest == nil {
+						accompaniment = append(accompaniment, model.Syllable{
+							OffsetMS:   posMS,
+							DurationMS: durMS,
+							Pitch:      pitchName(n.Pitch),
+						})
+					}
 					posMS += durMS
 					if posMS > maxPosMS {
 						maxPosMS = posMS
@@ -272,19 +282,20 @@ func parseMusicXMLBytes(data []byte) (*model.Song, error) {
 
 		cursorMS = measureStartMS + maxPosMS
 
-		if len(syllables) == 0 {
-			continue // compasso sem notas na voz escolhida — não gera evento
+		if len(syllables) == 0 && len(accompaniment) == 0 {
+			continue // compasso sem nenhuma nota — não gera evento
 		}
 		if measureChord == "" {
 			measureChord = currentChord
 		}
 
 		s.Timeline = append(s.Timeline, model.TimelineEvent{
-			TimeMS:     measureStartMS,
-			DurationMS: maxPosMS,
-			ChordStr:   measureChord,
-			Lyric:      lyricLine.String(),
-			Syllables:  syllables,
+			TimeMS:        measureStartMS,
+			DurationMS:    maxPosMS,
+			ChordStr:      measureChord,
+			Lyric:         lyricLine.String(),
+			Syllables:     syllables,
+			Accompaniment: accompaniment,
 		})
 	}
 

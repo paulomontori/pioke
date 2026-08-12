@@ -35,6 +35,10 @@ type TimelineEvent struct {
 	Velocity     int           `json:"velocity,omitempty" yaml:"velocity,omitempty"`
 	Articulation string        `json:"articulation,omitempty" yaml:"articulation,omitempty"`
 	Syllables    []Syllable    `json:"syllables,omitempty" yaml:"syllables,omitempty"`
+	// Accompaniment lista notas de outras vozes simultâneas (ex: baixo de uma partitura de
+	// violão) que soam junto com Syllables — mesma base de tempo (offset relativo ao início do
+	// evento), mas sem letra. Preenchido só pelo parser de MusicXML com mais de uma voz.
+	Accompaniment []Syllable `json:"accompaniment,omitempty" yaml:"accompaniment,omitempty"`
 }
 
 // Syllable representa uma sílaba cantada com propriedades avançadas

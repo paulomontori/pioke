@@ -27,7 +27,7 @@ func Run(s *model.Song, termUI *tui.TerminalUI, outputFile string) error {
 	// vez de sintetizar nota a nota em tempo real — assim ela soa exatamente igual ao arquivo
 	// exportado, sem depender de um agendador em tempo real (sujeito a atraso de GC, troca de
 	// goroutine, jitter do SO) para acertar cada troca de nota.
-	pcm := synth.RenderSequence(buildSegments(s))
+	pcm := synth.RenderSequence(synth.BuildSegments(s))
 
 	audioSynth := audio.NewSynth()
 	audioSynth.Play(pcm)
@@ -72,78 +72,4 @@ func Run(s *model.Song, termUI *tui.TerminalUI, outputFile string) error {
 	}
 	fmt.Printf("\nÁudio gravado com sucesso em: %s\n", outputFile)
 	return nil
-}
-
-func chordOf(ev *model.TimelineEvent) string {
-	if ev == nil {
-		return ""
-	}
-	if ev.ChordStr != "" {
-		return ev.ChordStr
-	}
-	if ev.Chord != nil {
-		return ev.Chord.Name
-	}
-	return ""
-}
-
-// buildSegments converte a timeline da música em uma sequência plana de segmentos de áudio
-// (notas/acordes/silêncios), na ordem cronológica, preenchendo silêncio nos intervalos entre eventos.
-// É determinístico — não depende de temporização de reprodução em tempo real — por isso a gravação
-// WAV fica sempre correta e sem cortes, independente de jitter do ticker ou do dispositivo de áudio.
-func buildSegments(s *model.Song) []synth.Segment {
-	var segs []synth.Segment
-	var cursorMS int64
-
-	appendSilence := func(durMS int64) {
-		if durMS > 0 {
-			segs = append(segs, synth.Segment{DurationMS: durMS})
-		}
-	}
-
-	for i := range s.Timeline {
-		event := &s.Timeline[i]
-
-		if event.TimeMS > cursorMS {
-			appendSilence(event.TimeMS - cursorMS)
-			cursorMS = event.TimeMS
-		}
-
-		if len(event.Syllables) > 0 {
-			for _, syl := range event.Syllables {
-				sylStart := event.TimeMS + syl.OffsetMS
-				if sylStart > cursorMS {
-					appendSilence(sylStart - cursorMS)
-					cursorMS = sylStart
-				}
-				dur := syl.DurationMS
-				if dur <= 0 {
-					continue
-				}
-
-				var freqs []float64
-				if syl.Pitch != "" {
-					if freq, ok := synth.NoteNameToFrequency(syl.Pitch); ok {
-						freqs = []float64{freq}
-					}
-				}
-				if len(freqs) == 0 {
-					freqs = synth.GetChordFrequencies(chordOf(event))
-				}
-
-				segs = append(segs, synth.Segment{Freqs: freqs, DurationMS: dur})
-				cursorMS += dur
-			}
-			continue
-		}
-
-		dur := event.DurationMS
-		if dur <= 0 {
-			dur = 800
-		}
-		segs = append(segs, synth.Segment{Freqs: synth.GetChordFrequencies(chordOf(event)), DurationMS: dur})
-		cursorMS += dur
-	}
-
-	return segs
 }
