@@ -33,22 +33,22 @@
       <note>
         <pitch><step>G</step><octave>4</octave></pitch>
         <duration>1</duration>
-        <lyric><syllabic>end</syllabic><text>ra</text></lyric>
+        <lyric><syllabic>middle</syllabic><text>ra</text></lyric>
       </note>
       <note>
         <pitch><step>A</step><octave>4</octave></pitch>
         <duration>2</duration>
-        <lyric><syllabic>single</syllabic><text>béns </text></lyric>
+        <lyric><syllabic>end</syllabic><text>béns</text></lyric>
       </note>
       <note>
         <pitch><step>G</step><octave>4</octave></pitch>
         <duration>2</duration>
-        <lyric><syllabic>single</syllabic><text>pra </text></lyric>
+        <lyric><syllabic>single</syllabic><text>pra</text></lyric>
       </note>
       <note>
         <pitch><step>C</step><octave>5</octave></pitch>
         <duration>2</duration>
-        <lyric><syllabic>single</syllabic><text>vo</text></lyric>
+        <lyric><syllabic>begin</syllabic><text>vo</text></lyric>
       </note>
     </measure>
     <measure number="2">
@@ -60,7 +60,7 @@
         <pitch><step>B</step><octave>4</octave></pitch>
         <duration>4</duration>
         <tie type="start"/>
-        <lyric><syllabic>single</syllabic><text>cê</text></lyric>
+        <lyric><syllabic>end</syllabic><text>cê</text></lyric>
       </note>
       <note>
         <pitch><step>B</step><octave>4</octave></pitch>

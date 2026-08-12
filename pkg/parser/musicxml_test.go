@@ -43,22 +43,22 @@ const testParabensMusicXML = `<?xml version="1.0" encoding="UTF-8"?>
       <note>
         <pitch><step>G</step><octave>4</octave></pitch>
         <duration>1</duration>
-        <lyric><syllabic>end</syllabic><text>ra</text></lyric>
+        <lyric><syllabic>middle</syllabic><text>ra</text></lyric>
       </note>
       <note>
         <pitch><step>A</step><octave>4</octave></pitch>
         <duration>2</duration>
-        <lyric><syllabic>single</syllabic><text>béns </text></lyric>
+        <lyric><syllabic>end</syllabic><text>béns</text></lyric>
       </note>
       <note>
         <pitch><step>G</step><octave>4</octave></pitch>
         <duration>2</duration>
-        <lyric><syllabic>single</syllabic><text>pra </text></lyric>
+        <lyric><syllabic>single</syllabic><text>pra</text></lyric>
       </note>
       <note>
         <pitch><step>C</step><octave>5</octave></pitch>
         <duration>2</duration>
-        <lyric><syllabic>single</syllabic><text>vo</text></lyric>
+        <lyric><syllabic>begin</syllabic><text>vo</text></lyric>
       </note>
     </measure>
     <measure number="2">
@@ -70,7 +70,7 @@ const testParabensMusicXML = `<?xml version="1.0" encoding="UTF-8"?>
         <pitch><step>B</step><octave>4</octave></pitch>
         <duration>4</duration>
         <tie type="start"/>
-        <lyric><syllabic>single</syllabic><text>cê</text></lyric>
+        <lyric><syllabic>end</syllabic><text>cê</text></lyric>
       </note>
       <note>
         <pitch><step>B</step><octave>4</octave></pitch>
@@ -138,8 +138,8 @@ func TestParseMusicXML(t *testing.T) {
 	wantSyllables := []model.Syllable{
 		{Text: "Pa", OffsetMS: 0, DurationMS: 300, Pitch: "G4"},
 		{Text: "ra", OffsetMS: 300, DurationMS: 300, Pitch: "G4"},
-		{Text: "béns ", OffsetMS: 600, DurationMS: 600, Pitch: "A4"},
-		{Text: "pra ", OffsetMS: 1200, DurationMS: 600, Pitch: "G4"},
+		{Text: "béns", OffsetMS: 600, DurationMS: 600, Pitch: "A4"},
+		{Text: "pra", OffsetMS: 1200, DurationMS: 600, Pitch: "G4"},
 		{Text: "vo", OffsetMS: 1800, DurationMS: 600, Pitch: "C5"},
 	}
 	assertSyllables(t, "Evento 0", ev0.Syllables, wantSyllables)

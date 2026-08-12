@@ -159,6 +159,7 @@ func parseMusicXMLBytes(data []byte) (*model.Song, error) {
 		var posMS int64    // posição dentro do compasso, afetada por <backup>/<forward>
 		var maxPosMS int64 // maior posição alcançada por qualquer voz = duração real do compasso
 		var syllables []model.Syllable
+		var lyricLine strings.Builder
 		measureChord := ""
 
 		divisionsToMS := func(divisionUnits int64) int64 {
@@ -241,8 +242,10 @@ func parseMusicXMLBytes(data []byte) (*model.Song, error) {
 					posMS += durMS
 				default:
 					text := ""
+					syllabic := ""
 					if n.Lyric != nil {
 						text = n.Lyric.Text
+						syllabic = n.Lyric.Syllabic
 					}
 					syllables = append(syllables, model.Syllable{
 						Text:       text,
@@ -250,6 +253,15 @@ func parseMusicXMLBytes(data []byte) (*model.Song, error) {
 						DurationMS: durMS,
 						Pitch:      pitchName(n.Pitch),
 					})
+					if text != "" {
+						// <syllabic> diz se esta sílaba continua a palavra anterior ("middle"/"end")
+						// ou começa uma nova ("single"/"begin"/ausente) — sem isso, sílabas de
+						// palavras diferentes ficariam coladas ("AndI'd" em vez de "And I'd").
+						if lyricLine.Len() > 0 && syllabic != "middle" && syllabic != "end" {
+							lyricLine.WriteByte(' ')
+						}
+						lyricLine.WriteString(text)
+					}
 					posMS += durMS
 				}
 				if posMS > maxPosMS {
@@ -265,11 +277,6 @@ func parseMusicXMLBytes(data []byte) (*model.Song, error) {
 		}
 		if measureChord == "" {
 			measureChord = currentChord
-		}
-
-		var lyricLine strings.Builder
-		for _, syl := range syllables {
-			lyricLine.WriteString(syl.Text)
 		}
 
 		s.Timeline = append(s.Timeline, model.TimelineEvent{
