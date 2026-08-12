@@ -14,7 +14,9 @@ type Segment struct {
 }
 
 // RenderSequence sintetiza uma sequência de segmentos (notas, acordes e silêncios) como um único
-// buffer PCM estéreo de 16 bits contínuo.
+// buffer PCM estéreo de 16 bits contínuo — uma única linha/voz por vez (ex: só a melodia, ou só o
+// acompanhamento); para tocar vozes simultâneas juntas, renderize cada uma separadamente e some
+// com MixPCM.
 //
 // Sintetizar cada nota isoladamente com sua própria envolvente ADSR completa soa "picotado": mesmo
 // quando duas notas são adjacentes (sem silêncio real entre elas), o volume cai quase a zero no fim
@@ -95,4 +97,36 @@ func RenderSequence(segments []Segment) []byte {
 	}
 
 	return buf.Bytes()
+}
+
+// MixPCM soma duas trilhas PCM estéreo 16-bit amostra a amostra (a trilha mais curta é
+// completada com silêncio), arredondando (clipping) para o range de int16 quando a soma estoura.
+func MixPCM(a, b []byte) []byte {
+	n := len(a)
+	if len(b) > n {
+		n = len(b)
+	}
+	// mantém alinhado a um número inteiro de amostras estéreo 16-bit (4 bytes por amostra)
+	n -= n % 4
+
+	out := make([]byte, n)
+	for i := 0; i+1 < n; i += 2 {
+		var av, bv int32
+		if i+1 < len(a) {
+			av = int32(int16(uint16(a[i]) | uint16(a[i+1])<<8))
+		}
+		if i+1 < len(b) {
+			bv = int32(int16(uint16(b[i]) | uint16(b[i+1])<<8))
+		}
+		sum := av + bv
+		switch {
+		case sum > 32767:
+			sum = 32767
+		case sum < -32768:
+			sum = -32768
+		}
+		out[i] = byte(uint16(sum))
+		out[i+1] = byte(uint16(sum) >> 8)
+	}
+	return out
 }

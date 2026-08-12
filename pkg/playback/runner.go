@@ -27,7 +27,7 @@ func Run(s *model.Song, termUI *tui.TerminalUI, outputFile string) error {
 	// vez de sintetizar nota a nota em tempo real — assim ela soa exatamente igual ao arquivo
 	// exportado, sem depender de um agendador em tempo real (sujeito a atraso de GC, troca de
 	// goroutine, jitter do SO) para acertar cada troca de nota.
-	pcm := synth.RenderSequence(synth.BuildSegments(s))
+	pcm := synth.RenderSong(s)
 
 	audioSynth := audio.NewSynth()
 	audioSynth.Play(pcm)
