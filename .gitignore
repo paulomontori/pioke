@@ -18,3 +18,6 @@ errors.txt
 # Imagens de rascunho / design local
 pioke_logo.png
 .aider*
+
+# Gravações de microfone geradas pelo usuário (flag -record)
+recordings/

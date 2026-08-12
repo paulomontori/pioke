@@ -5,6 +5,7 @@ package playback
 
 import (
 	"fmt"
+	"time"
 
 	"pioke/pkg/audio"
 	"pioke/pkg/engine"
@@ -16,8 +17,10 @@ import (
 
 // Run inicializa a TUI, o motor de reprodução e o sintetizador de áudio para a música informada,
 // sintetizando com o timbre escolhido (ver synth.Timbre). Bloqueia até o encerramento da TUI. Se
-// outputFile não for vazio, grava o mesmo áudio sintetizado em um arquivo WAV ao final.
-func Run(s *model.Song, termUI *tui.TerminalUI, outputFile string, timbre synth.Timbre) error {
+// outputFile não for vazio, grava o mesmo áudio sintetizado em um arquivo WAV ao final. Se record
+// for true, também captura o microfone durante a reprodução e salva em recordings/ (ver
+// RecordingMeta) — pensado pra permitir avaliar depois a qualidade do canto de quem usou o PioKe.
+func Run(s *model.Song, termUI *tui.TerminalUI, outputFile string, timbre synth.Timbre, record bool, songFile string) error {
 	termUI.DisplayHeader(s)
 	if err := termUI.Init(); err != nil {
 		return fmt.Errorf("erro ao inicializar TUI: %w", err)
@@ -29,7 +32,13 @@ func Run(s *model.Song, termUI *tui.TerminalUI, outputFile string, timbre synth.
 	// goroutine, jitter do SO) para acertar cada troca de nota.
 	pcm := synth.RenderSongWithTimbre(s, timbre)
 
+	// A captura do microfone começa antes da reprodução: o offset real entre os dois instantes
+	// (que pode variar por causa da inicialização do dispositivo de captura) é medido e salvo,
+	// em vez de assumir que os dois começam exatamente juntos.
+	micRecorder, recordStart := startRecording(record)
+
 	audioSynth := audio.NewSynth()
+	playbackStart := time.Now()
 	audioSynth.Play(pcm)
 
 	eng := engine.NewEngine(s)
@@ -57,6 +66,7 @@ func Run(s *model.Song, termUI *tui.TerminalUI, outputFile string, timbre synth.
 
 	eng.Stop()
 	audioSynth.Stop()
+	finishRecording(micRecorder, recordStart, playbackStart, s, songFile, timbre)
 
 	if outputFile == "" {
 		return nil

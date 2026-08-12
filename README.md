@@ -124,8 +124,11 @@ go run cmd/pioke-cli/main.go
 
 * `-timbre additive|karplus` — escolhe o motor de síntese: `additive` (padrão, harmônicos aditivos) ou `karplus` (Karplus-Strong, corda dedilhada). Ex: `go run main.go -timbre karplus musica.mxl`.
 * `-out caminho.wav` — além de tocar ao vivo, grava o áudio sintetizado (com o timbre escolhido) em um arquivo WAV.
+* `-record` — grava o microfone durante a reprodução (quem estiver cantando junto), salvando em `recordings/<música>_<data-hora>.wav` mais um `.json` com metadados (música, timbre, e o offset em ms entre o início da gravação e o início real da reprodução, pra alinhar com a timeline da música depois). Pensado como primeiro passo para uma futura avaliação de qualidade do canto. Requer um microfone disponível no sistema; se a captura falhar, a música toca normalmente mesmo assim, só sem gravar.
 
-As duas flags podem vir em qualquer posição em relação ao caminho da música.
+  > **Build com CGO:** a captura de microfone usa [`malgo`](https://github.com/gen2brain/malgo), que depende de CGO — é preciso ter um compilador C instalado (`gcc`) e `CGO_ENABLED=1` (padrão do Go quando há compilador disponível) para compilar o projeto. No Windows, uma forma simples de instalar: `winget install -e --id BrechtSanders.WinLibs.POSIX.UCRT` (adicione a pasta `mingw64\bin` da instalação ao PATH). No Raspberry Pi/Linux, o `gcc` costuma já estar disponível ou é um `apt install build-essential`.
+
+As flags podem vir em qualquer posição em relação ao caminho da música.
 
 ---
 
