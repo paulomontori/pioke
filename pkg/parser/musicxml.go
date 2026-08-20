@@ -135,14 +135,14 @@ func parseMusicXMLBytes(data []byte) (*model.Song, error) {
 		return nil, fmt.Errorf("MusicXML sem nenhuma <part>")
 	}
 
-	title := firstNonEmpty(doc.Work.WorkTitle, doc.MovementTitle)
+	title := collapseWhitespace(firstNonEmpty(doc.Work.WorkTitle, doc.MovementTitle))
 	if title == "" {
 		return nil, fmt.Errorf("MusicXML sem título (<work-title> ou <movement-title>)")
 	}
 
 	s := &model.Song{
 		Title:  title,
-		Artist: doc.Identification.creatorName(),
+		Artist: collapseWhitespace(doc.Identification.creatorName()),
 	}
 
 	part := selectMelodyPart(doc)
@@ -153,6 +153,11 @@ func parseMusicXMLBytes(data []byte) (*model.Song, error) {
 	currentChord := ""
 	selectedVoice := "" // primeira <voice> encontrada no documento; demais vozes são ignoradas
 	var cursorMS int64
+	// prevSyllable aponta pra última sílaba com texto adicionada em qualquer compasso (mesmo já
+	// tendo virado um TimelineEvent anterior em s.Timeline — o ponteiro continua válido porque
+	// aponta pro array de Syllables daquele evento, não pro slice s.Timeline em si). Usado pra
+	// embutir o espaço de separação de palavras diretamente no texto da sílaba (ver abaixo).
+	var prevSyllable *model.Syllable
 
 	for _, measure := range part.Measures {
 		measureStartMS := cursorMS
@@ -257,6 +262,28 @@ func parseMusicXMLBytes(data []byte) (*model.Song, error) {
 						text = n.Lyric.Text
 						syllabic = n.Lyric.Syllabic
 					}
+					startsNewWord := syllabic != "middle" && syllabic != "end"
+					if text != "" {
+						// <syllabic> diz se esta sílaba continua a palavra anterior ("middle"/"end")
+						// ou começa uma nova ("single"/"begin"/ausente) — sem isso, sílabas de
+						// palavras diferentes ficariam coladas ("AndI'd" em vez de "And I'd").
+						//
+						// O espaço de separação é embutido diretamente no texto da sílaba anterior
+						// (não só numa lyricLine agregada à parte): consumidores que precisam do
+						// tempo por sílaba — não só da linha inteira já pronta, como uma tela de
+						// karaokê com destaque progressivo — leem o array Syllables diretamente, e
+						// sem o espaço embutido ali as palavras ficam coladas mesmo a lyricLine
+						// estando correta. prevSyllable pode apontar pra sílaba de um evento
+						// (compasso) anterior já fechado — a mutação ainda é visível porque aponta
+						// pro mesmo array de Syllables daquele evento.
+						if prevSyllable != nil && startsNewWord && !strings.HasSuffix(prevSyllable.Text, " ") {
+							prevSyllable.Text += " "
+						}
+						if lyricLine.Len() > 0 && startsNewWord {
+							lyricLine.WriteByte(' ')
+						}
+						lyricLine.WriteString(text)
+					}
 					syllables = append(syllables, model.Syllable{
 						Text:       text,
 						OffsetMS:   posMS,
@@ -264,13 +291,7 @@ func parseMusicXMLBytes(data []byte) (*model.Song, error) {
 						Pitch:      pitchName(n.Pitch),
 					})
 					if text != "" {
-						// <syllabic> diz se esta sílaba continua a palavra anterior ("middle"/"end")
-						// ou começa uma nova ("single"/"begin"/ausente) — sem isso, sílabas de
-						// palavras diferentes ficariam coladas ("AndI'd" em vez de "And I'd").
-						if lyricLine.Len() > 0 && syllabic != "middle" && syllabic != "end" {
-							lyricLine.WriteByte(' ')
-						}
-						lyricLine.WriteString(text)
+						prevSyllable = &syllables[len(syllables)-1]
 					}
 					posMS += durMS
 				}
@@ -450,6 +471,14 @@ func (id mxIdentification) creatorName() string {
 		return strings.TrimSpace(id.Creators[0].Name)
 	}
 	return ""
+}
+
+// collapseWhitespace reduz qualquer sequência de espaços/quebras de linha a um único espaço.
+// Alguns exportadores de partitura (ex: MuseScore) colocam créditos com quebra de linha dentro de
+// um único <creator>/<work-title> — sem isso, título/artista viram texto multi-linha que atropela
+// outras linhas em telas que exibem uma música por linha (ex: a lista de seleção da GUI).
+func collapseWhitespace(s string) string {
+	return strings.Join(strings.Fields(s), " ")
 }
 
 type mxPartList struct {

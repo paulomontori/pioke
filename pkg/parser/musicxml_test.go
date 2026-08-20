@@ -138,8 +138,12 @@ func TestParseMusicXML(t *testing.T) {
 	wantSyllables := []model.Syllable{
 		{Text: "Pa", OffsetMS: 0, DurationMS: 300, Pitch: "G4"},
 		{Text: "ra", OffsetMS: 300, DurationMS: 300, Pitch: "G4"},
-		{Text: "béns", OffsetMS: 600, DurationMS: 600, Pitch: "A4"},
-		{Text: "pra", OffsetMS: 1200, DurationMS: 600, Pitch: "G4"},
+		// "béns" e "pra" trazem o espaço de separação embutido no texto porque a sílaba seguinte
+		// começa uma palavra nova (<syllabic> "single"/"begin") — ver comentário em
+		// parseMusicXMLBytes. "vo" não leva espaço porque "cê" (evento seguinte) é <syllabic>
+		// "end": mesma palavra ("você"), só partida em dois eventos por causa da nota ligada.
+		{Text: "béns ", OffsetMS: 600, DurationMS: 600, Pitch: "A4"},
+		{Text: "pra ", OffsetMS: 1200, DurationMS: 600, Pitch: "G4"},
 		{Text: "vo", OffsetMS: 1800, DurationMS: 600, Pitch: "C5"},
 	}
 	assertSyllables(t, "Evento 0", ev0.Syllables, wantSyllables)
