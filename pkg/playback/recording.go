@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -16,6 +18,11 @@ import (
 	"pioke/pkg/model"
 	"pioke/pkg/synth"
 )
+
+// maxRecordings é o número máximo de gravações mantidas em recordings/ — a cada nova gravação
+// salva, as mais antigas (por data de modificação) são apagadas até respeitar esse limite, pra
+// gravações de teste não acumularem indefinidamente em disco.
+const maxRecordings = 10
 
 // RecordingMeta descreve uma gravação de microfone salva junto de uma sessão de reprodução —
 // suficiente pra, depois, alinhar o áudio cantado com a timeline esperada da música (offset entre
@@ -104,6 +111,51 @@ func finishRecording(rec *audio.MicRecorder, recordStart, playbackStart time.Tim
 	}
 
 	fmt.Printf("\nGravação salva em %s (metadados em %s)\n", wavPath, metaPath)
+
+	enforceRecordingLimit("recordings")
+}
+
+// enforceRecordingLimit mantém no máximo maxRecordings gravações no diretório dir, apagando as
+// mais antigas (por data de modificação do .wav) quando o limite é excedido. Cada gravação é um
+// par <base>.wav + <base>.json com o mesmo nome base (ver finishRecording); os dois arquivos do
+// par são sempre removidos juntos.
+func enforceRecordingLimit(dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+
+	type recording struct {
+		base    string
+		modTime time.Time
+	}
+	var recs []recording
+	for _, e := range entries {
+		if e.IsDir() || strings.ToLower(filepath.Ext(e.Name())) != ".wav" {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		recs = append(recs, recording{
+			base:    strings.TrimSuffix(e.Name(), filepath.Ext(e.Name())),
+			modTime: info.ModTime(),
+		})
+	}
+
+	if len(recs) <= maxRecordings {
+		return
+	}
+
+	sort.Slice(recs, func(i, j int) bool { return recs[i].modTime.Before(recs[j].modTime) })
+
+	excess := len(recs) - maxRecordings
+	for _, r := range recs[:excess] {
+		_ = os.Remove(filepath.Join(dir, r.base+".wav"))
+		_ = os.Remove(filepath.Join(dir, r.base+".json"))
+	}
+	fmt.Printf("[gravação] limite de %d gravações atingido: %d gravação(ões) mais antiga(s) removida(s) de %s/\n", maxRecordings, excess, dir)
 }
 
 // slugify converte um título de música em um nome de arquivo seguro e legível: acentos viram a
